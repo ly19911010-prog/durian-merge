@@ -13,6 +13,13 @@ export interface FruitTierDef {
   nameEn: string;
   /** display-radius multiplier on top of baseRadius */
   radiusScale: number;
+  /**
+   * Per-fruit physics body factor: flesh inscribed-circle radius ÷ texture
+   * size, measured from the v13 art (fruits are centered, transparent padding
+   * removed). Because each fruit's flesh fills the canvas differently
+   * (0.61–0.91), a single global factor can never fit all fruits gap-free.
+   */
+  bodyFactor: number;
   /** score awarded when THIS tier is created by a merge */
   scoreOnCreate: number;
   /** particle tint color for merges */
@@ -48,11 +55,11 @@ export const GAME = {
   baseRadius: 32,
 
   /**
-   * Physics body radius = visual (display) radius × this factor.
-   * Fruit PNGs carry transparent padding, so a 1:1 body leaves a visible
-   * gap between touching fruits; 0.92 lets the flesh visually kiss on contact.
+   * Body radius = visual radius × this fruit's bodyFactor × this overlap.
+   * 0.99 makes the flesh visually kiss on contact (fully gap-free) while
+   * collision/merge still trigger on the slightly smaller body.
    */
-  bodyRadiusFactor: 0.92,
+  bodyTouchOverlap: 0.99,
 
   physics: {
     gravityY: 1,
@@ -75,16 +82,16 @@ export const GAME = {
 } as const;
 
 export const FRUITS: FruitTierDef[] = [
-  { tier: 1,  tex: 'fruit_01', nameZh: '龙眼',   nameEn: 'Longan',      radiusScale: 0.55, scoreOnCreate: 10,   color: 0xf5e6c8 },
-  { tier: 2,  tex: 'fruit_02', nameZh: '红毛丹', nameEn: 'Rambutan',    radiusScale: 0.65, scoreOnCreate: 20,   color: 0xff5a5a },
-  { tier: 3,  tex: 'fruit_03', nameZh: '青柠',   nameEn: 'Lime',        radiusScale: 0.75, scoreOnCreate: 40,   color: 0x9be15d },
-  { tier: 4,  tex: 'fruit_04', nameZh: '山竹',   nameEn: 'Mangosteen',  radiusScale: 0.82, scoreOnCreate: 80,   color: 0x9b59b6 },
-  { tier: 5,  tex: 'fruit_05', nameZh: '椰子',   nameEn: 'Coconut',     radiusScale: 0.92, scoreOnCreate: 150,  color: 0xd9c39a },
-  { tier: 6,  tex: 'fruit_06', nameZh: '柚子',   nameEn: 'Pomelo',      radiusScale: 1.00, scoreOnCreate: 250,  color: 0xffe08a },
-  { tier: 7,  tex: 'fruit_07', nameZh: '芒果',   nameEn: 'Mango',       radiusScale: 1.12, scoreOnCreate: 400,  color: 0xffb340 },
-  { tier: 8,  tex: 'fruit_08', nameZh: '火龙果', nameEn: 'Dragon Fruit',radiusScale: 1.22, scoreOnCreate: 650,  color: 0xff4d88 },
-  { tier: 9,  tex: 'fruit_09', nameZh: '菠萝',   nameEn: 'Pineapple',   radiusScale: 1.34, scoreOnCreate: 1000, color: 0xffd23f },
-  { tier: 10, tex: 'fruit_10', nameZh: '榴莲',   nameEn: 'Durian',      radiusScale: 1.48, scoreOnCreate: 1600, color: 0x8bc34a },
+  { tier: 1,  tex: 'fruit_01', nameZh: '龙眼',   nameEn: 'Longan',      radiusScale: 0.55, bodyFactor: 0.8379, scoreOnCreate: 10,   color: 0xf5e6c8 },
+  { tier: 2,  tex: 'fruit_02', nameZh: '红毛丹', nameEn: 'Rambutan',    radiusScale: 0.65, bodyFactor: 0.9141, scoreOnCreate: 20,   color: 0xff5a5a },
+  { tier: 3,  tex: 'fruit_03', nameZh: '青柠',   nameEn: 'Lime',        radiusScale: 0.75, bodyFactor: 0.8613, scoreOnCreate: 40,   color: 0x9be15d },
+  { tier: 4,  tex: 'fruit_04', nameZh: '山竹',   nameEn: 'Mangosteen',  radiusScale: 0.82, bodyFactor: 0.793,  scoreOnCreate: 80,   color: 0x9b59b6 },
+  { tier: 5,  tex: 'fruit_05', nameZh: '椰子',   nameEn: 'Coconut',     radiusScale: 0.92, bodyFactor: 0.9102, scoreOnCreate: 150,  color: 0xd9c39a },
+  { tier: 6,  tex: 'fruit_06', nameZh: '柚子',   nameEn: 'Pomelo',      radiusScale: 1.00, bodyFactor: 0.8516, scoreOnCreate: 250,  color: 0xffe08a },
+  { tier: 7,  tex: 'fruit_07', nameZh: '芒果',   nameEn: 'Mango',       radiusScale: 1.12, bodyFactor: 0.8555, scoreOnCreate: 400,  color: 0xffb340 },
+  { tier: 8,  tex: 'fruit_08', nameZh: '火龙果', nameEn: 'Dragon Fruit',radiusScale: 1.22, bodyFactor: 0.6816, scoreOnCreate: 650,  color: 0xff4d88 },
+  { tier: 9,  tex: 'fruit_09', nameZh: '菠萝',   nameEn: 'Pineapple',   radiusScale: 1.34, bodyFactor: 0.6113, scoreOnCreate: 1000, color: 0xffd23f },
+  { tier: 10, tex: 'fruit_10', nameZh: '榴莲',   nameEn: 'Durian',      radiusScale: 1.48, bodyFactor: 0.8242, scoreOnCreate: 1600, color: 0x8bc34a },
 ];
 
 export const MAX_TIER = FRUITS.length;
@@ -94,6 +101,13 @@ export function radiusForTier(tier: number): number {
   const def = FRUITS[tier - 1];
   if (!def) throw new Error(`invalid tier ${tier}`);
   return GAME.baseRadius * def.radiusScale;
+}
+
+/** Physics body factor for a tier (flesh inscribed circle ÷ texture size). */
+export function bodyFactorForTier(tier: number): number {
+  const def = FRUITS[tier - 1];
+  if (!def) throw new Error(`invalid tier ${tier}`);
+  return def.bodyFactor;
 }
 
 /** Texture key for a tier. */
