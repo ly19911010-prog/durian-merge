@@ -6,6 +6,8 @@ import { makeText } from '../systems/ui';
 
 // v3.0: _v30 files are the jelly-style redraw (was _v24 de-fringed art),
 // renamed for cache-busting (phone browsers cached the old URLs).
+// rebuild-trigger: single-commit redeploy after the 12-commit flood left
+// the TS builds in a failed state on Vercel.
 const FRUIT_FILES: Array<[string, string]> = [
   ['fruit_01', 'assets/fruits/fruit_01_v30.png'],
   ['fruit_02', 'assets/fruits/fruit_02_v30.png'],
