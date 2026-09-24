@@ -36,12 +36,17 @@ function ok(cond, name) {
 }
 const approx = (a, b) => Math.abs(a - b) < 1e-9;
 
-// --- radius: monotonic, tier1 = 40 * 0.55 ---
-ok(approx(logic.radiusForTier(1), 22), 'radius tier1 = 22');
+// --- radius: geometric growth, d(i) = 34 × 1.1775^(i-1) ---
+ok(approx(logic.radiusForTier(1), 17), 'radius tier1 = 17 (diameter 34)');
 let mono = true;
 for (let t = 2; t <= 10; t++) if (!(logic.radiusForTier(t) > logic.radiusForTier(t - 1))) mono = false;
 ok(mono, 'radius strictly increasing 1..10');
-ok(approx(logic.radiusForTier(10), 40 * 1.48), 'radius tier10 = 59.2');
+const ratios = [];
+for (let t = 2; t <= 10; t++) ratios.push(logic.radiusForTier(t) / logic.radiusForTier(t - 1));
+ok(ratios.every((x) => approx(x, cfg.GAME.geoRatio)), 'constant geometric ratio across tiers 1..10');
+ok(Math.abs(logic.radiusForTier(10) - 74) < 1e-6, 'radius tier10 ≈ 74 (diameter ≈ 148)');
+ok(logic.radiusForTier(10) * 2 <= 150, 'tier10 diameter <= 150');
+ok(logic.radiusForTier(1) * 2 >= 30, 'tier1 diameter >= 30');
 // per-fruit body factors measured from the v2.0 art (flesh ÷ texture), so every
 // fruit's flesh visually kisses on contact with zero gap
 const expectedFactors = { 1: 0.668, 2: 0.8965, 3: 0.7656, 4: 0.8008, 5: 0.8672, 6: 0.8164, 7: 0.668, 8: 0.6523, 9: 0.5371, 10: 0.7734 };
@@ -55,7 +60,7 @@ ok(Object.entries(expectedFactors).every(([t, f]) => {
 }), 'body radius slightly smaller than visual radius, all tiers');
 // biggest spawnable fruit (tier4) fits the 392px-wide container with margin
 ok(logic.radiusForTier(4) * 2 < cfg.GAME.innerRight - cfg.GAME.innerLeft, 'tier4 diameter < container width');
-// biggest fruit (tier10 durian, r=59.2) still fits and stays playable in the container
+// biggest fruit (tier10 durian, diameter ≈ 148) still fits and stays playable in the container
 ok(logic.radiusForTier(10) * 2 < cfg.GAME.innerRight - cfg.GAME.innerLeft, 'tier10 diameter < container width');
 // physics "fruit feel": gentle bounce, medium friction, uniform density
 ok(approx(cfg.GAME.physics.restitution, 0.25), 'restitution = 0.25');
