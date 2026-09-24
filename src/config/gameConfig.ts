@@ -17,10 +17,12 @@ export interface FruitTierDef {
    * gap between adjacent tiers is constant and clearly visible.
    */
   /**
-   * Per-fruit physics body factor. v2.4: 1.0 for every tier — the physics
-   * circle now matches the visual circle 1:1, so adjacent fruits touch
-   * edge-to-edge with no visual overlap. (Older builds used per-fruit
-   * measured factors 0.48–0.90, which made fruits sink into each other.)
+   * Per-fruit physics body factor: measured tight-art mean diameter / 512.
+   * The v3.0 jelly art only fills 62–88% of its 512px canvas, so a body of
+   * 1.0 left a visible gap between touching fruits (with the contact shadow
+   * faking the touch). Matching the body to the drawn fruit makes neighbours
+   * kiss edge-to-edge; the bbox includes a faint outer glow, so contact lands
+   * as a hair of nestling overlap rather than a gap.
    */
   bodyFactor: number;
   /** score awarded when THIS tier is created by a merge */
@@ -70,12 +72,15 @@ export const GAME = {
 
   /**
    * Body radius = visual radius × this fruit's bodyFactor × this overlap.
-   * bodyFactor is 1.0 for every tier (v2.4): physics radius == visual radius,
-   * so touching fruits visually kiss edge-to-edge instead of sinking into
-   * each other. The 0.99 overlap keeps a hair of solver margin so resting
-   * contacts never jitter — visually still gap-free.
+   * bodyFactor is the measured tight-art factor per tier (v3.1): the physics
+   * circle matches the drawn fruit. Pixel measurement showed ~1.5px of
+   * residual gap at body contact (AA edges, non-circular art vs circular
+   * body), so the overlap is 0.97: bodies sit 3% inside the art and touching
+   * fruits truly kiss (up to a hair of overlap, which reads as soft pressing
+   * and pairs with the resting squash). Still plenty of solver margin —
+   * contacts are stable and merges trigger on collisionstart as before.
    */
-  bodyTouchOverlap: 0.99,
+  bodyTouchOverlap: 0.97,
 
   physics: {
     gravityY: 1,
@@ -98,16 +103,17 @@ export const GAME = {
 } as const;
 
 export const FRUITS: FruitTierDef[] = [
-  { tier: 1,  tex: 'fruit_01', nameZh: '龙眼',   nameEn: 'Longan',      bodyFactor: 1.0, scoreOnCreate: 10,   color: 0xf5e6c8 },
-  { tier: 2,  tex: 'fruit_02', nameZh: '红毛丹', nameEn: 'Rambutan',    bodyFactor: 1.0, scoreOnCreate: 20,   color: 0xff5a5a },
-  { tier: 3,  tex: 'fruit_03', nameZh: '青柠',   nameEn: 'Lime',        bodyFactor: 1.0, scoreOnCreate: 40,   color: 0x9be15d },
-  { tier: 4,  tex: 'fruit_04', nameZh: '山竹',   nameEn: 'Mangosteen',  bodyFactor: 1.0, scoreOnCreate: 80,   color: 0x9b59b6 },
-  { tier: 5,  tex: 'fruit_05', nameZh: '椰子',   nameEn: 'Coconut',     bodyFactor: 1.0, scoreOnCreate: 150,  color: 0xd9c39a },
-  { tier: 6,  tex: 'fruit_06', nameZh: '柚子',   nameEn: 'Pomelo',      bodyFactor: 1.0, scoreOnCreate: 250,  color: 0xffe08a },
-  { tier: 7,  tex: 'fruit_07', nameZh: '芒果',   nameEn: 'Mango',       bodyFactor: 1.0, scoreOnCreate: 400,  color: 0xffb340 },
-  { tier: 8,  tex: 'fruit_08', nameZh: '火龙果', nameEn: 'Dragon Fruit',bodyFactor: 1.0, scoreOnCreate: 650,  color: 0xff4d88 },
-  { tier: 9,  tex: 'fruit_09', nameZh: '菠萝',   nameEn: 'Pineapple',   bodyFactor: 1.0, scoreOnCreate: 1000, color: 0xffd23f },
-  { tier: 10, tex: 'fruit_10', nameZh: '榴莲',   nameEn: 'Durian',      bodyFactor: 1.0, scoreOnCreate: 1600, color: 0x8bc34a },
+  // bodyFactor = measured tight-art mean diameter / 512 (v3.1) — see note above
+  { tier: 1,  tex: 'fruit_01', nameZh: '龙眼',   nameEn: 'Longan',      bodyFactor: 0.694, scoreOnCreate: 10,   color: 0xf5e6c8 },
+  { tier: 2,  tex: 'fruit_02', nameZh: '红毛丹', nameEn: 'Rambutan',    bodyFactor: 0.811, scoreOnCreate: 20,   color: 0xff5a5a },
+  { tier: 3,  tex: 'fruit_03', nameZh: '青柠',   nameEn: 'Lime',        bodyFactor: 0.856, scoreOnCreate: 40,   color: 0x9be15d },
+  { tier: 4,  tex: 'fruit_04', nameZh: '山竹',   nameEn: 'Mangosteen',  bodyFactor: 0.906, scoreOnCreate: 80,   color: 0x9b59b6 },
+  { tier: 5,  tex: 'fruit_05', nameZh: '椰子',   nameEn: 'Coconut',     bodyFactor: 0.779, scoreOnCreate: 150,  color: 0xd9c39a },
+  { tier: 6,  tex: 'fruit_06', nameZh: '柚子',   nameEn: 'Pomelo',      bodyFactor: 0.76, scoreOnCreate: 250,  color: 0xffe08a },
+  { tier: 7,  tex: 'fruit_07', nameZh: '芒果',   nameEn: 'Mango',       bodyFactor: 0.811, scoreOnCreate: 400,  color: 0xffb340 },
+  { tier: 8,  tex: 'fruit_08', nameZh: '火龙果', nameEn: 'Dragon Fruit',bodyFactor: 0.841, scoreOnCreate: 650,  color: 0xff4d88 },
+  { tier: 9,  tex: 'fruit_09', nameZh: '菠萝',   nameEn: 'Pineapple',   bodyFactor: 0.788, scoreOnCreate: 1000, color: 0xffd23f },
+  { tier: 10, tex: 'fruit_10', nameZh: '榴莲',   nameEn: 'Durian',      bodyFactor: 0.828, scoreOnCreate: 1600, color: 0x8bc34a },
 ];
 
 export const MAX_TIER = FRUITS.length;
