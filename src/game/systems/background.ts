@@ -1,35 +1,33 @@
-/** Shared tropical background. */
+/** Shared tropical-dusk background: photo backdrop + drifting light dust + vignette. */
 import Phaser from 'phaser';
 import { GAME } from '../../config/gameConfig';
 
 export function drawBackground(scene: Phaser.Scene): void {
-  const g = scene.add.graphics().setDepth(-10);
-  // warm gradient sky
-  g.fillGradientStyle(0xfff7de, 0xfff7de, 0xffd98f, 0xffd98f, 1, 1, 1, 1);
-  g.fillRect(0, 0, GAME.width, GAME.height);
-  // gentle sun glow behind the playfield for a softer, warmer center
-  g.fillStyle(0xfffbe8, 0.32);
-  g.fillCircle(GAME.width / 2, 300, 150);
-  g.fillStyle(0xfffbe8, 0.22);
-  g.fillCircle(GAME.width / 2, 300, 215);
-  // soft decorative blobs
-  const blobs: Array<[number, number, number, number]> = [
-    [60, 620, 90, 0xffedb8],
-    [370, 560, 70, 0xffe3a1],
-    [330, 180, 46, 0xd8f3b0],
-    [80, 240, 36, 0xd8f3b0],
-  ];
-  for (const [x, y, r, c] of blobs) {
-    g.fillStyle(c, 0.5);
-    g.fillCircle(x, y, r);
+  // full-bleed dusk photo, cover-fit to the 420x740 playfield
+  const bg = scene.add.image(GAME.width / 2, GAME.height / 2, 'bg_dusk');
+  bg.setScale(Math.max(GAME.width / bg.width, GAME.height / bg.height));
+  bg.setDepth(-10);
+
+  // warm light-dust motes drifting upward (one shared emitter, cheap)
+  // NOTE: requires the 'dot' texture generated in BootScene.create()
+  const dust = scene.add.particles(0, 0, 'dot', {
+    x: { min: 0, max: GAME.width },
+    y: { min: 0, max: GAME.height },
+    lifespan: { min: 4000, max: 9000 },
+    speedY: { min: -14, max: -4 },
+    speedX: { min: -6, max: 6 },
+    scale: { min: 0.05, max: 0.14 },
+    alpha: { start: 0.5, end: 0 },
+    tint: [0xffe9a8, 0xffd98f, 0xfff6d8],
+    quantity: 1,
+    frequency: 900,
+  });
+  dust.setDepth(-9);
+
+  // soft vignette to focus the play area (kept subtle so HUD stays readable)
+  const vg = scene.add.graphics().setDepth(50);
+  for (let i = 0; i < 6; i++) {
+    vg.lineStyle(26, 0x2a1430, 0.04 + (i / 6) * 0.1);
+    vg.strokeRect(i * 13, i * 13, GAME.width - i * 26, GAME.height - i * 26);
   }
-  // soft ground shadow under the play area for depth
-  g.fillGradientStyle(0xe8b96a, 0xe8b96a, 0xd9a44f, 0xd9a44f, 0.35, 0.35, 0.5, 0.5);
-  g.fillEllipse(GAME.width / 2, GAME.floorTop + 26, 340, 44);
-  // subtle vignette to lift the center
-  const vg = scene.add.graphics().setDepth(-9);
-  vg.fillGradientStyle(0x8a5a20, 0x8a5a20, 0x8a5a20, 0x8a5a20, 0, 0, 0.12, 0.12);
-  vg.fillRect(0, 0, GAME.width, 90);
-  vg.fillGradientStyle(0x8a5a20, 0x8a5a20, 0x8a5a20, 0x8a5a20, 0.12, 0.12, 0, 0);
-  vg.fillRect(0, GAME.height - 120, GAME.width, 120);
 }
