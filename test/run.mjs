@@ -49,14 +49,16 @@ ok(logic.radiusForTier(10) * 2 <= 150, 'tier10 diameter <= 150');
 ok(logic.radiusForTier(1) * 2 >= 30, 'tier1 diameter >= 30');
 // per-fruit body factors measured from the v2.0 art (flesh ÷ texture), so every
 // fruit's flesh visually kisses on contact with zero gap
-const expectedFactors = { 1: 0.668, 2: 0.8965, 3: 0.7656, 4: 0.8008, 5: 0.8672, 6: 0.8164, 7: 0.668, 8: 0.6523, 9: 0.5371, 10: 0.7734 };
+const expectedFactors = { 1: 0.8574, 2: 0.875, 3: 0.8477, 4: 0.7344, 5: 0.8145, 6: 0.8945, 7: 0.668, 8: 0.6758, 9: 0.4824, 10: 0.6797 };
 ok(Object.entries(expectedFactors).every(([t, f]) => approx(cfg.bodyFactorForTier(Number(t)), f)), 'per-tier bodyFactor table 1..10');
 ok(approx(cfg.GAME.bodyTouchOverlap, 0.99), 'touch overlap factor = 0.99');
 // body radius (256*factor*0.99) lands between flesh and texture size for all tiers
+// (lower bound 0.45: tier 9 pineapple's inscribed circle is small because the
+// tall crown counts toward texture height — its body width is what collides)
 ok(Object.entries(expectedFactors).every(([t, f]) => {
   const r = logic.radiusForTier(Number(t));
   const bodyR = r * f * cfg.GAME.bodyTouchOverlap;
-  return bodyR < r && bodyR > r * 0.5;
+  return bodyR < r && bodyR > r * 0.45;
 }), 'body radius slightly smaller than visual radius, all tiers');
 // biggest spawnable fruit (tier4) fits the 392px-wide container with margin
 ok(logic.radiusForTier(4) * 2 < cfg.GAME.innerRight - cfg.GAME.innerLeft, 'tier4 diameter < container width');
