@@ -77,6 +77,9 @@ export class GameScene extends Phaser.Scene {
           this.maybeThud();
           this.pendingMerges.push([a, b]);
         }
+        // landing squash when a fruit first strikes the floor or the pile
+        this.maybeLandSquash(a, pair.bodyB.gameObject);
+        this.maybeLandSquash(b, pair.bodyA.gameObject);
       }
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -253,6 +256,40 @@ export class GameScene extends Phaser.Scene {
     if (now - this.lastThudAt < 90) return;
     this.lastThudAt = now;
     sfx.thud();
+  }
+
+  /** Squash & stretch when a fruit first lands on the floor or the pile. */
+  private maybeLandSquash(fruit: FruitGO | null, otherGO: unknown): void {
+    if (!fruit || !fruit.body || fruit.getData('hasLanded')) return;
+    if (fruit.getData('popping')) return; // popIn tween owns the scale right now
+    const body = fruit.body as MatterJS.BodyType;
+    const vy = body.velocity.y;
+    if (vy < 4) return; // only hard downward landings
+    const other = otherGO as FruitGO | undefined;
+    const otherIsFruit = !!(other && other.getData && other.getData('isFruit'));
+    if (otherIsFruit) {
+      // pile landing: only when we're above the other fruit
+      if (fruit.y > (other as FruitGO).y + 2) return;
+    } else if (Math.abs(body.velocity.x) > vy) {
+      return; // side brush against a wall, not a landing
+    }
+    fruit.setData('hasLanded', true);
+    const sx = fruit.scaleX;
+    const sy = fruit.scaleY;
+    // brief squash; the Matter body follows the scale (by design), which reads
+    // as soft-fruit impact and settles back exactly.
+    this.tweens.add({
+      targets: fruit,
+      scaleX: sx * 1.18,
+      scaleY: sy * 0.78,
+      duration: 90,
+      ease: 'Quad.easeOut',
+      yoyo: true,
+      onComplete: () => {
+        if (fruit.active) fruit.setScale(sx, sy);
+      },
+    });
+    sfx.land();
   }
 
   private processMerges(): void {
@@ -559,9 +596,19 @@ export class GameScene extends Phaser.Scene {
       const r = radiusForTier(this.currentTier);
       this.aimImg.x = clampDropX(this.aimX, r);
       this.aimImg.y = GAME.aimY + Math.sin(time / 320) * 3;
+      // clear, dotted aim guide with a landing marker
       this.aimGuide.clear();
-      this.aimGuide.lineStyle(2, 0x4a7c2f, 0.3);
-      this.aimGuide.lineBetween(this.aimImg.x, GAME.aimY + r + 4, this.aimImg.x, GAME.floorTop - 6);
+      const gx = this.aimImg.x;
+      const y0 = GAME.aimY + r + 6;
+      const y1 = GAME.floorTop - 8;
+      this.aimGuide.fillStyle(0x4a7c2f, 0.55);
+      for (let y = y0; y < y1; y += 14) {
+        this.aimGuide.fillCircle(gx, y, 2.5);
+      }
+      // landing marker: pulsing ring where the fruit will land
+      const pulse = 1 + Math.sin(time / 240) * 0.12;
+      this.aimGuide.lineStyle(2.5, 0x4a7c2f, 0.65);
+      this.aimGuide.strokeCircle(gx, y1, r * pulse);
     } else {
       this.aimGuide.clear();
     }
