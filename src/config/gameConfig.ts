@@ -11,8 +11,11 @@ export interface FruitTierDef {
   tex: string;
   nameZh: string;
   nameEn: string;
-  /** display-radius multiplier on top of baseRadius */
-  radiusScale: number;
+  /**
+   * Display radius is NOT per-tier: it grows geometrically across tiers,
+   * diameter(i) = GAME.geoBaseDiameter × GAME.geoRatio^(i-1), so the size
+   * gap between adjacent tiers is constant and clearly visible.
+   */
   /**
    * Per-fruit physics body factor: flesh inscribed-circle radius ÷ texture
    * size, measured from the v13 art (fruits are centered, transparent padding
@@ -52,7 +55,14 @@ export const GAME = {
   spawnTiers: [1, 2, 3, 4] as number[],
   spawnWeights: [42, 32, 20, 6] as number[],
 
-  baseRadius: 40,
+  /**
+   * Fruit display sizes grow geometrically:
+   *   diameter(i) = geoBaseDiameter × geoRatio^(i-1)
+   * tier1 (龙眼) 34px → tier10 (榴莲) 148px; geoRatio ≈ 1.1775, so every
+   * adjacent tier is ~18% bigger — the level gap is obvious at a glance.
+   */
+  geoBaseDiameter: 34,
+  geoRatio: (148 / 34) ** (1 / 9),
 
   /**
    * Body radius = visual radius × this fruit's bodyFactor × this overlap.
@@ -82,25 +92,25 @@ export const GAME = {
 } as const;
 
 export const FRUITS: FruitTierDef[] = [
-  { tier: 1,  tex: 'fruit_01', nameZh: '龙眼',   nameEn: 'Longan',      radiusScale: 0.55, bodyFactor: 0.668, scoreOnCreate: 10,   color: 0xf5e6c8 },
-  { tier: 2,  tex: 'fruit_02', nameZh: '红毛丹', nameEn: 'Rambutan',    radiusScale: 0.65, bodyFactor: 0.8965, scoreOnCreate: 20,   color: 0xff5a5a },
-  { tier: 3,  tex: 'fruit_03', nameZh: '青柠',   nameEn: 'Lime',        radiusScale: 0.75, bodyFactor: 0.7656, scoreOnCreate: 40,   color: 0x9be15d },
-  { tier: 4,  tex: 'fruit_04', nameZh: '山竹',   nameEn: 'Mangosteen',  radiusScale: 0.82, bodyFactor: 0.8008,  scoreOnCreate: 80,   color: 0x9b59b6 },
-  { tier: 5,  tex: 'fruit_05', nameZh: '椰子',   nameEn: 'Coconut',     radiusScale: 0.92, bodyFactor: 0.8672, scoreOnCreate: 150,  color: 0xd9c39a },
-  { tier: 6,  tex: 'fruit_06', nameZh: '柚子',   nameEn: 'Pomelo',      radiusScale: 1.00, bodyFactor: 0.8164, scoreOnCreate: 250,  color: 0xffe08a },
-  { tier: 7,  tex: 'fruit_07', nameZh: '芒果',   nameEn: 'Mango',       radiusScale: 1.12, bodyFactor: 0.668, scoreOnCreate: 400,  color: 0xffb340 },
-  { tier: 8,  tex: 'fruit_08', nameZh: '火龙果', nameEn: 'Dragon Fruit',radiusScale: 1.22, bodyFactor: 0.6523, scoreOnCreate: 650,  color: 0xff4d88 },
-  { tier: 9,  tex: 'fruit_09', nameZh: '菠萝',   nameEn: 'Pineapple',   radiusScale: 1.34, bodyFactor: 0.5371, scoreOnCreate: 1000, color: 0xffd23f },
-  { tier: 10, tex: 'fruit_10', nameZh: '榴莲',   nameEn: 'Durian',      radiusScale: 1.48, bodyFactor: 0.7734, scoreOnCreate: 1600, color: 0x8bc34a },
+  { tier: 1,  tex: 'fruit_01', nameZh: '龙眼',   nameEn: 'Longan',      bodyFactor: 0.668, scoreOnCreate: 10,   color: 0xf5e6c8 },
+  { tier: 2,  tex: 'fruit_02', nameZh: '红毛丹', nameEn: 'Rambutan',    bodyFactor: 0.8965, scoreOnCreate: 20,   color: 0xff5a5a },
+  { tier: 3,  tex: 'fruit_03', nameZh: '青柠',   nameEn: 'Lime',        bodyFactor: 0.7656, scoreOnCreate: 40,   color: 0x9be15d },
+  { tier: 4,  tex: 'fruit_04', nameZh: '山竹',   nameEn: 'Mangosteen',  bodyFactor: 0.8008,  scoreOnCreate: 80,   color: 0x9b59b6 },
+  { tier: 5,  tex: 'fruit_05', nameZh: '椰子',   nameEn: 'Coconut',     bodyFactor: 0.8672, scoreOnCreate: 150,  color: 0xd9c39a },
+  { tier: 6,  tex: 'fruit_06', nameZh: '柚子',   nameEn: 'Pomelo',      bodyFactor: 0.8164, scoreOnCreate: 250,  color: 0xffe08a },
+  { tier: 7,  tex: 'fruit_07', nameZh: '芒果',   nameEn: 'Mango',       bodyFactor: 0.668, scoreOnCreate: 400,  color: 0xffb340 },
+  { tier: 8,  tex: 'fruit_08', nameZh: '火龙果', nameEn: 'Dragon Fruit',bodyFactor: 0.6523, scoreOnCreate: 650,  color: 0xff4d88 },
+  { tier: 9,  tex: 'fruit_09', nameZh: '菠萝',   nameEn: 'Pineapple',   bodyFactor: 0.5371, scoreOnCreate: 1000, color: 0xffd23f },
+  { tier: 10, tex: 'fruit_10', nameZh: '榴莲',   nameEn: 'Durian',      bodyFactor: 0.7734, scoreOnCreate: 1600, color: 0x8bc34a },
 ];
 
 export const MAX_TIER = FRUITS.length;
 
 /** Display (physics) radius in px for a tier. */
+/** Display (visual) radius in px for a tier: geometric growth, d(i) = geoBaseDiameter × geoRatio^(i-1). */
 export function radiusForTier(tier: number): number {
-  const def = FRUITS[tier - 1];
-  if (!def) throw new Error(`invalid tier ${tier}`);
-  return GAME.baseRadius * def.radiusScale;
+  if (!FRUITS[tier - 1]) throw new Error(`invalid tier ${tier}`);
+  return (GAME.geoBaseDiameter / 2) * Math.pow(GAME.geoRatio, tier - 1);
 }
 
 /** Physics body factor for a tier (flesh inscribed circle ÷ texture size). */
