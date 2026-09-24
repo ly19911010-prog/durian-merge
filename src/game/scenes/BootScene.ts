@@ -2,20 +2,21 @@
 import Phaser from 'phaser';
 import { GAME } from '../../config/gameConfig';
 import { STR } from '../../config/strings';
+import { makeText } from '../systems/ui';
 
-// v2.4: _v24 files are the v2.3 de-fringed art, renamed for cache-busting
-// (phone browsers cached the old fruit_XX.png / fruit_XX_<name>.png URLs).
+// v3.0: _v30 files are the jelly-style redraw (was _v24 de-fringed art),
+// renamed for cache-busting (phone browsers cached the old URLs).
 const FRUIT_FILES: Array<[string, string]> = [
-  ['fruit_01', 'assets/fruits/fruit_01_v24.png'],
-  ['fruit_02', 'assets/fruits/fruit_02_v24.png'],
-  ['fruit_03', 'assets/fruits/fruit_03_v24.png'],
-  ['fruit_04', 'assets/fruits/fruit_04_v24.png'],
-  ['fruit_05', 'assets/fruits/fruit_05_v24.png'],
-  ['fruit_06', 'assets/fruits/fruit_06_v24.png'],
-  ['fruit_07', 'assets/fruits/fruit_07_v24.png'],
-  ['fruit_08', 'assets/fruits/fruit_08_v24.png'],
-  ['fruit_09', 'assets/fruits/fruit_09_v24.png'],
-  ['fruit_10', 'assets/fruits/fruit_10_v24.png'],
+  ['fruit_01', 'assets/fruits/fruit_01_v30.png'],
+  ['fruit_02', 'assets/fruits/fruit_02_v30.png'],
+  ['fruit_03', 'assets/fruits/fruit_03_v30.png'],
+  ['fruit_04', 'assets/fruits/fruit_04_v30.png'],
+  ['fruit_05', 'assets/fruits/fruit_05_v30.png'],
+  ['fruit_06', 'assets/fruits/fruit_06_v30.png'],
+  ['fruit_07', 'assets/fruits/fruit_07_v30.png'],
+  ['fruit_08', 'assets/fruits/fruit_08_v30.png'],
+  ['fruit_09', 'assets/fruits/fruit_09_v30.png'],
+  ['fruit_10', 'assets/fruits/fruit_10_v30.png'],
 ];
 
 export class BootScene extends Phaser.Scene {
@@ -24,15 +25,13 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    const label = this.add
-      .text(GAME.width / 2, GAME.height / 2, STR.loading, {
-        fontSize: '24px',
-        color: '#5b3a1e',
-      })
-      .setOrigin(0.5);
+    const label = makeText(this, GAME.width / 2, GAME.height / 2, STR.loading, {
+      fontSize: '24px',
+      color: '#5b3a1e',
+    }).setOrigin(0.5);
     this.load.on('complete', () => label.destroy());
     for (const [key, path] of FRUIT_FILES) this.load.image(key, path);
-    this.load.image('bg_dusk', 'assets/bg/bg_dusk.jpg');
+    this.load.image('bg_dusk', 'assets/bg/bg_dusk_v25.jpg');
   }
 
   create(): void {
@@ -63,6 +62,18 @@ export class BootScene extends Phaser.Scene {
       g.fillEllipse(32, 16, 62 * s, 30 * s);
     }
     g.generateTexture('contactAO', 64, 32);
+    // jelly gloss (128x64): soft white specular streak stamped top-left of
+    // every fruit — the cheapest 3D cue. GameScene syncs one instance per
+    // fruit every frame (counter-rotated so the light stays top-left in
+    // screen space while the fruit rolls). Layered alphas give a soft
+    // falloff; the sprite itself runs at alpha ~0.32.
+    g.clear();
+    for (let i = 0; i < 7; i++) {
+      const s = 1 - i * 0.12;
+      g.fillStyle(0xffffff, 0.18);
+      g.fillEllipse(64, 32, 122 * s, 58 * s);
+    }
+    g.generateTexture('gloss', 128, 64);
     // ring for durian-burst shockwave — generated at 256px because the
     // shockwave scales it up ~1.6x; the old 64px version upscaled 6.4x and
     // looked blurry (GameScene.shockwave divides by 256 now)
