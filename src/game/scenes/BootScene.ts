@@ -53,17 +53,6 @@ export class BootScene extends Phaser.Scene {
       g.fillEllipse(32, 16, 60 * s, 28 * s);
     }
     g.generateTexture('blob', 64, 32);
-    // contact AO (64x32): softer, more falloff layers than the blob shadow.
-    // GameScene.updateContactShadows() stamps these at fruit-vs-fruit contact
-    // points so touching fruits read as nestling instead of hard tangent
-    // circles. Darker core baked in; sprites run at alpha 1.
-    g.clear();
-    for (let i = 0; i < 8; i++) {
-      const s = 1 - i * 0.1;
-      g.fillStyle(0x201004, 0.055);
-      g.fillEllipse(32, 16, 62 * s, 30 * s);
-    }
-    g.generateTexture('contactAO', 64, 32);
     // jelly gloss (128x64): soft white specular streak stamped top-left of
     // every fruit — the cheapest 3D cue. GameScene syncs one instance per
     // fruit every frame (counter-rotated so the light stays top-left in
