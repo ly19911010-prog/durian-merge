@@ -4,7 +4,8 @@ import { BootScene } from './game/scenes/BootScene';
 import { StartScene } from './game/scenes/StartScene';
 import { GameScene } from './game/scenes/GameScene';
 
-const game = new Phaser.Game({
+function createGame(): void {
+  const game = new Phaser.Game({
   type: Phaser.WEBGL,
   width: GAME.width,
   height: GAME.height,
@@ -37,8 +38,25 @@ const game = new Phaser.Game({
     },
   },
   scene: [BootScene, StartScene, GameScene],
-});
+  });
 
-// Diagnostic handle for automated smoke tests (used by CI-style harnesses
-// to read scene state); harmless in production.
-(window as unknown as { __durian?: Phaser.Game }).__durian = game;
+  // Diagnostic handle for automated smoke tests (used by CI-style harnesses
+  // to read scene state); harmless in production.
+  (window as unknown as { __durian?: Phaser.Game }).__durian = game;
+}
+
+// Wait for the display font (ZCOOL KuaiLe) before booting so canvas text
+// renders in it on first paint; 2.5s cap keeps offline loads working.
+async function boot(): Promise<void> {
+  try {
+    await Promise.race([
+      document.fonts.load('20px "ZCOOL KuaiLe"'),
+      new Promise((resolve) => setTimeout(resolve, 2500)),
+    ]);
+  } catch {
+    /* offline or blocked fonts: fall back silently */
+  }
+  createGame();
+}
+
+void boot();
