@@ -16,7 +16,7 @@ import {
 import { loadBest, saveBest } from '../../utils/storage';
 import { sfx } from '../../audio/sfx';
 import { drawBackground } from '../systems/background';
-import { makeButton, makeIconButton, FONT_FAMILY } from '../systems/ui';
+import { makeButton, makeIconButton, makeText, FONT_FAMILY } from '../systems/ui';
 import { createFruit, popIn, FruitGO } from '../systems/fruitFactory';
 
 type State = 'aim' | 'paused' | 'over';
@@ -158,10 +158,10 @@ export class GameScene extends Phaser.Scene {
       g.fillRect(x, 0, t, F + t);
       g.lineStyle(1.5, 0x6e4520, 0.55);
       for (let y = 46; y < F; y += 54) g.lineBetween(x + 2, y, x + t - 2, y);
-      g.lineStyle(2, 0xe0b070, 0.85); // inner bevel light
+      g.lineStyle(2, 0xe0b070, 0.7); // inner bevel light (v2.5: softened)
       const bx = x === 0 ? x + t - 1.5 : x + 1.5;
       g.lineBetween(bx, 4, bx, F + t - 4);
-      g.lineStyle(2, 0x5e3a18, 0.9); // outer dark edge
+      g.lineStyle(2, 0x5e3a18, 0.55); // outer dark edge (v2.5: softened)
       const ox = x === 0 ? x + 1.5 : x + t - 1.5;
       g.lineBetween(ox, 4, ox, F + t - 4);
     }
@@ -170,7 +170,7 @@ export class GameScene extends Phaser.Scene {
     g.fillRect(0, F, GAME.width, H - F);
     g.lineStyle(1.5, 0x6e4520, 0.55);
     for (let x = 52; x < GAME.width; x += 62) g.lineBetween(x, F + 3, x, H - 3);
-    g.lineStyle(2, 0xe0b070, 0.85);
+    g.lineStyle(2, 0xe0b070, 0.7); // (v2.5: softened)
     g.lineBetween(4, F + 1.5, GAME.width - 4, F + 1.5); // top bevel light
     g.fillStyle(0x5e3a18, 0.35); // soft contact shadow under the playfield
     g.fillRect(L, F - 6, R - L, 6);
@@ -180,11 +180,10 @@ export class GameScene extends Phaser.Scene {
   private buildDangerLine(): void {
     this.dangerGfx = this.add.graphics().setDepth(5);
     this.redrawDangerLine(0.45);
-    this.add
-      .text(GAME.width / 2, GAME.dangerLineY - 18, STR.dangerLine, {
-        fontFamily: FONT_FAMILY, fontSize: '14px', color: '#fff3d9',
-        stroke: '#a03010', strokeThickness: 4,
-      })
+    makeText(this, GAME.width / 2, GAME.dangerLineY - 18, STR.dangerLine, {
+      fontFamily: FONT_FAMILY, fontSize: '14px', color: '#fff3d9',
+      stroke: '#a03010', strokeThickness: 4,
+    })
       .setOrigin(0.5)
       .setDepth(5);
   }
@@ -206,24 +205,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildHud(): void {
-    this.add.text(16, 8, STR.score, {
+    makeText(this, 16, 8, STR.score, {
       fontFamily: FONT_FAMILY, fontSize: '17px', color: '#7a4a20',
     });
-    this.scoreText = this.add
-      .text(16, 24, '0', {
+    this.scoreText = makeText(this, 16, 24, '0', {
         fontFamily: FONT_FAMILY, fontSize: '34px', color: '#fff8ea',
         stroke: '#7a4a20', strokeThickness: 6,
       });
 
-    this.bestText = this.add.text(150, 32, `${STR.bestScore} ${this.best}`, {
+    this.bestText = makeText(this, 150, 32, `${STR.bestScore} ${this.best}`, {
       fontFamily: FONT_FAMILY, fontSize: '17px', color: '#fff3d9',
       stroke: '#7a4a20', strokeThickness: 4,
     });
 
-    this.add.text(292, 8, STR.next, {
+    makeText(this, 292, 8, STR.next, {
       fontFamily: FONT_FAMILY, fontSize: '17px', color: '#7a4a20',
     });
-    this.nextImg = this.add.image(322, 46, 'fruit_01').setDisplaySize(64, 64);
+    this.nextImg = this.add.image(322, 46, 'fruit_01').setDisplaySize(38, 38);
 
     makeIconButton(this, 386, 24, STR.pauseIcon, () => this.togglePause());
     this.soundBtn = makeIconButton(this, 386, 58, sfx.isMuted() ? STR.soundOff : STR.soundOn, () => {
@@ -277,9 +275,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Pool of contact-AO sprites (depth 1.5: above blob shadows, below fruits).
-   *  Allocation-free: 28 sprites created once, repositioned every frame. */
+   *  Allocation-free: 40 sprites created once, repositioned every frame. */
   private buildContactShadows(): void {
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 40; i++) {
       const s = this.add.image(-100, -100, 'contactAO');
       s.setDepth(1.5).setVisible(false);
       this.contactPool.push(s);
@@ -322,9 +320,87 @@ export class GameScene extends Phaser.Scene {
       s.setVisible(true);
       s.setPosition(px, py);
       s.setRotation(Math.atan2(dy, dx) + Math.PI / 2);
-      s.setScale((rm * 1.15) / 64, (rm * 0.5) / 32);
+      // v2.5: ~25% larger than before so piled fruits read as nestling into
+      // each other — part of the "not stickers" brief
+      s.setScale((rm * 1.4) / 64, (rm * 0.66) / 32);
     }
     for (let i = used; i < pool.length; i++) pool[i].setVisible(false);
+  }
+
+  /**
+   * Resting contact squash — the soft-body half of the "not stickers" brief.
+   * v2.3's impact squash only fires on collisionstart; a settled pile is
+   * rigid circles with hard wedge gaps between them. Every frame we read
+   * Matter's active pairs, accumulate each fruit's dominant contact axis
+   * (sign-free, so a fruit pressed top AND bottom still reads as vertical
+   * pressure), and lerp its scale toward 6% compression along the axis /
+   * 3% stretch across it. No contact → lerp back to the round base scale.
+   *
+   * Coordination with the other scale writers: impact squash ('squashing'),
+   * popIn ('popping'), land squash ('landing') and merges each own the scale
+   * while their flag is set — resting pauses for that fruit and resumes
+   * after. Fruit-vs-floor/wall contacts flatten the bottom/side the same way.
+   */
+  private updateRestingSquash(delta: number): void {
+    for (const f of this.fruits) {
+      if (!f.active) continue;
+      f.setData('restAX', 0);
+      f.setData('restAY', 0);
+      f.setData('restN', 0);
+    }
+    const pairs = (this.matter.world.engine.pairs?.list ?? []) as Array<{
+      bodyA: { gameObject?: unknown; position: { x: number; y: number } };
+      bodyB: { gameObject?: unknown; position: { x: number; y: number } };
+      isActive?: boolean;
+    }>;
+    for (const pair of pairs) {
+      if (pair.isActive === false) continue;
+      const goA = pair.bodyA.gameObject as FruitGO | undefined;
+      const goB = pair.bodyB.gameObject as FruitGO | undefined;
+      const fa = goA && goA.active && goA.getData('isFruit') ? goA : null;
+      const fb = goB && goB.active && goB.getData('isFruit') ? goB : null;
+      if (!fa && !fb) continue;
+      if (fa && (fa.getData('merging') || fa.getData('popping'))) continue;
+      if (fb && (fb.getData('merging') || fb.getData('popping'))) continue;
+      // squash is symmetric: accumulate |axis| so opposite contacts add up
+      let dx = pair.bodyB.position.x - pair.bodyA.position.x;
+      let dy = pair.bodyB.position.y - pair.bodyA.position.y;
+      const l = Math.hypot(dx, dy);
+      if (l < 0.01) continue;
+      dx = Math.abs(dx / l);
+      dy = Math.abs(dy / l);
+      if (fa) {
+        fa.setData('restAX', (fa.getData('restAX') as number) + dx);
+        fa.setData('restAY', (fa.getData('restAY') as number) + dy);
+        fa.setData('restN', (fa.getData('restN') as number) + 1);
+      }
+      if (fb) {
+        fb.setData('restAX', (fb.getData('restAX') as number) + dx);
+        fb.setData('restAY', (fb.getData('restAY') as number) + dy);
+        fb.setData('restN', (fb.getData('restN') as number) + 1);
+      }
+    }
+    const k = Math.min(1, delta * 0.012);
+    for (const f of this.fruits) {
+      if (!f.active) continue;
+      if (f.getData('merging') || f.getData('popping') || f.getData('squashing') || f.getData('landing')) continue;
+      const baseSX = f.getData('baseSX') as number | undefined;
+      const baseSY = f.getData('baseSY') as number | undefined;
+      if (!baseSX || !baseSY) continue;
+      let tSX = baseSX;
+      let tSY = baseSY;
+      if ((f.getData('restN') as number) > 0) {
+        const horizontal = (f.getData('restAX') as number) >= (f.getData('restAY') as number);
+        tSX = baseSX * (horizontal ? 0.94 : 1.03);
+        tSY = baseSY * (horizontal ? 1.03 : 0.94);
+      }
+      const nSX = f.scaleX + (tSX - f.scaleX) * k;
+      const nSY = f.scaleY + (tSY - f.scaleY) * k;
+      f.setScale(
+        Math.abs(tSX - nSX) < 0.0004 ? tSX : nSX,
+        Math.abs(tSY - nSY) < 0.0004 ? tSY : nSY,
+      );
+    }
   }
 
   // ---------------- aiming & dropping ----------------
@@ -369,7 +445,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateNextPreview(): void {
-    this.nextImg.setTexture(FRUITS[this.nextTier - 1].tex).setDisplaySize(64, 64);
+    this.nextImg.setTexture(FRUITS[this.nextTier - 1].tex).setDisplaySize(38, 38);
   }
 
   private enforceCap(): void {
@@ -495,6 +571,8 @@ export class GameScene extends Phaser.Scene {
       return; // side brush against a wall, not a landing
     }
     fruit.setData('hasLanded', true);
+    // 'landing' guard: updateRestingSquash() must not fight this tween's scale
+    fruit.setData('landing', true);
     const sx = fruit.scaleX;
     const sy = fruit.scaleY;
     // brief squash; the Matter body follows the scale (by design), which reads
@@ -507,7 +585,10 @@ export class GameScene extends Phaser.Scene {
       ease: 'Quad.easeOut',
       yoyo: true,
       onComplete: () => {
-        if (fruit.active) fruit.setScale(sx, sy);
+        if (fruit.active) {
+          fruit.setScale(sx, sy);
+          fruit.setData('landing', false);
+        }
       },
     });
     sfx.land();
@@ -633,9 +714,12 @@ export class GameScene extends Phaser.Scene {
   private removeFruit(f: FruitGO): void {
     const i = this.fruits.indexOf(f);
     if (i >= 0) this.fruits.splice(i, 1);
-    // the blob shadow is a separate GameObject — destroy it with the fruit
+    // the blob shadow and jelly gloss are separate GameObjects — destroy
+    // them with the fruit
     const sh = f.getData('shadow') as Phaser.GameObjects.Image | undefined;
     if (sh && sh.active) sh.destroy();
+    const gl = f.getData('gloss') as Phaser.GameObjects.Image | undefined;
+    if (gl && gl.active) gl.destroy();
     // a chained merge can destroy a fruit while its pop tween is still
     // running — kill tweens first, otherwise the tween writes scale to a
     // dead Matter body and throws.
@@ -646,8 +730,7 @@ export class GameScene extends Phaser.Scene {
   // ---------------- juice ----------------
 
   private floatText(x: number, y: number, str: string, color: string, size: number): void {
-    const t = this.add
-      .text(x, y, str, {
+    const t = makeText(this, x, y, str, {
         fontSize: `${size}px`,
         color,
         fontStyle: 'bold',
@@ -777,14 +860,12 @@ export class GameScene extends Phaser.Scene {
     panel.lineStyle(4, 0xe0a83e, 1);
     panel.strokeRoundedRect(cx - 165, cy - 190, 330, 380, 18);
 
-    const title = this.add
-      .text(cx, cy - 150, STR.gameOver, { fontSize: '34px', color: '#c0392b', fontStyle: 'bold' })
+    const title = makeText(this, cx, cy - 150, STR.gameOver, { fontSize: '34px', color: '#c0392b', fontStyle: 'bold' })
       .setOrigin(0.5);
     const recordTxt = isRecord
-      ? this.add.text(cx, cy - 112, STR.newRecord, { fontSize: '18px', color: '#e67e22', fontStyle: 'bold' }).setOrigin(0.5)
+      ? makeText(this, cx, cy - 112, STR.newRecord, { fontSize: '18px', color: '#e67e22', fontStyle: 'bold' }).setOrigin(0.5)
       : null;
-    const scoreTxt = this.add
-      .text(cx, cy - 66, `${STR.yourScore}\n${this.score}`, {
+    const scoreTxt = makeText(this, cx, cy - 66, `${STR.yourScore}\n${this.score}`, {
         fontSize: '22px',
         color: '#4a2f12',
         align: 'center',
@@ -792,14 +873,12 @@ export class GameScene extends Phaser.Scene {
         lineSpacing: 6,
       })
       .setOrigin(0.5);
-    const bestTxt = this.add
-      .text(cx, cy + 2, `${STR.bestScore}：${this.best}`, { fontSize: '18px', color: '#7a5a2e' })
+    const bestTxt = makeText(this, cx, cy + 2, `${STR.bestScore}：${this.best}`, { fontSize: '18px', color: '#7a5a2e' })
       .setOrigin(0.5);
 
     const topDef = FRUITS[this.maxTierReached - 1];
     const fruitImg = this.add.image(cx - 52, cy + 52, topDef.tex).setDisplaySize(44, 44);
-    const fruitTxt = this.add
-      .text(cx + 62, cy + 52, `${STR.highestFruit}\n${topDef.nameZh}`, {
+    const fruitTxt = makeText(this, cx + 62, cy + 52, `${STR.highestFruit}\n${topDef.nameZh}`, {
         fontSize: '18px',
         color: '#4a7c2f',
         align: 'center',
@@ -844,8 +923,7 @@ export class GameScene extends Phaser.Scene {
     const panel = this.add.graphics();
     panel.fillStyle(0xfffdf4, 1);
     panel.fillRoundedRect(cx - 140, cy - 130, 280, 260, 18);
-    const title = this.add
-      .text(cx, cy - 92, STR.paused, { fontSize: '30px', color: '#4a2f12', fontStyle: 'bold' })
+    const title = makeText(this, cx, cy - 92, STR.paused, { fontSize: '30px', color: '#4a2f12', fontStyle: 'bold' })
       .setOrigin(0.5);
     const resumeBtn = makeButton(this, cx, cy - 24, 200, 52, STR.resume, () => this.resumeGame(), { depth: 101 });
     const restartBtn = makeButton(this, cx, cy + 44, 200, 52, STR.restart, () => this.restartGame(), {
@@ -913,16 +991,19 @@ export class GameScene extends Phaser.Scene {
       // clear, dotted aim guide with a landing marker
       this.aimGuide.clear();
       const gx = this.aimImg.x;
+      // landing marker: pulsing ring resting ON the floor (bottom of the
+      // ring kisses floorTop, so it never dips into the wooden frame)
+      const pulse = 1 + Math.sin(time / 240) * 0.12;
+      const ringR = r * pulse;
+      const ringY = GAME.floorTop - ringR;
       const y0 = GAME.aimY + r + 6;
-      const y1 = GAME.floorTop - 8;
+      const y1 = ringY - ringR - 8;
       this.aimGuide.fillStyle(0x4a7c2f, 0.55);
       for (let y = y0; y < y1; y += 14) {
         this.aimGuide.fillCircle(gx, y, 2.5);
       }
-      // landing marker: pulsing ring where the fruit will land
-      const pulse = 1 + Math.sin(time / 240) * 0.12;
       this.aimGuide.lineStyle(2.5, 0x4a7c2f, 0.65);
-      this.aimGuide.strokeCircle(gx, y1, r * pulse);
+      this.aimGuide.strokeCircle(gx, ringY, ringR);
     } else {
       this.aimGuide.clear();
     }
@@ -931,22 +1012,37 @@ export class GameScene extends Phaser.Scene {
     this.checkDanger(time);
     this.updateShadows();
     this.updateContactShadows();
+    this.updateRestingSquash(delta);
   }
 
-  /** Sync each fruit's blob shadow: glued under the fruit, shrinking and
-   *  fading as the fruit rises — sells the 3D depth. Allocation-free. */
+  /** Sync each fruit's followers: the blob shadow glued under the fruit
+   *  (shrinking/fading as the fruit rises — sells the 3D depth) and the
+   *  jelly gloss highlight (screen-space top-left, counter-rotated against
+   *  the fruit's roll, deforming with the resting squash). Allocation-free. */
   private updateShadows(): void {
     for (const f of this.fruits) {
       if (!f.active) continue;
-      const sh = f.getData('shadow') as Phaser.GameObjects.Image | undefined;
-      if (!sh) continue;
       const r = radiusForTier(f.getData('tier') as number);
-      const hFrac = Phaser.Math.Clamp((GAME.floorTop - f.y) / GAME.floorTop, 0, 1);
-      sh.x = f.x;
-      sh.y = f.y + r * (0.92 - 0.3 * hFrac);
-      const s = 1 - 0.35 * hFrac;
-      sh.setScale((f.getData('shSX') as number) * s, (f.getData('shSY') as number) * s);
-      sh.setAlpha(0.3 * (1 - 0.45 * hFrac));
+      const sh = f.getData('shadow') as Phaser.GameObjects.Image | undefined;
+      if (sh && sh.active) {
+        const hFrac = Phaser.Math.Clamp((GAME.floorTop - f.y) / GAME.floorTop, 0, 1);
+        sh.x = f.x;
+        sh.y = f.y + r * (0.92 - 0.3 * hFrac);
+        const s = 1 - 0.35 * hFrac;
+        sh.setScale((f.getData('shSX') as number) * s, (f.getData('shSY') as number) * s);
+        sh.setAlpha(0.3 * (1 - 0.45 * hFrac));
+      }
+      const gl = f.getData('gloss') as Phaser.GameObjects.Image | undefined;
+      if (gl && gl.active) {
+        const baseSX = f.getData('baseSX') as number;
+        const baseSY = f.getData('baseSY') as number;
+        const kx = f.scaleX / baseSX;
+        const ky = f.scaleY / baseSY;
+        gl.x = f.x - r * 0.3 * kx;
+        gl.y = f.y - r * 0.36 * ky;
+        gl.setScale((f.getData('glSX') as number) * kx, (f.getData('glSY') as number) * ky);
+        gl.setRotation(-0.45 - f.rotation);
+      }
     }
   }
 }
