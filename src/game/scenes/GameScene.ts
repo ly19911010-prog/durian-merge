@@ -16,7 +16,7 @@ import {
 import { loadBest, saveBest } from '../../utils/storage';
 import { sfx } from '../../audio/sfx';
 import { drawBackground } from '../systems/background';
-import { makeButton, makeIconButton } from '../systems/ui';
+import { makeButton, makeIconButton, FONT_FAMILY } from '../systems/ui';
 import { createFruit, popIn, FruitGO } from '../systems/fruitFactory';
 
 type State = 'aim' | 'paused' | 'over';
@@ -120,52 +120,96 @@ export class GameScene extends Phaser.Scene {
 
   private buildWalls(): void {
     const t = 14;
-    const wallColor = 0x9c6b3c;
+    // invisible physics bounds (positions unchanged)
     const mkWall = (x: number, y: number, w: number, h: number) => {
-      const rect = this.add.rectangle(x, y, w, h, wallColor);
-      rect.setStrokeStyle(2, 0x7a4f28);
+      const rect = this.add.rectangle(x, y, w, h, 0xffffff, 0);
       this.matter.add.gameObject(rect, { isStatic: true, friction: 0.4 });
     };
     mkWall(t / 2, GAME.height / 2, t, GAME.height); // left
     mkWall(GAME.width - t / 2, GAME.height / 2, t, GAME.height); // right
     mkWall(GAME.width / 2, GAME.floorTop + t, GAME.width, t * 2); // floor
+    this.drawWoodFrame();
+  }
+
+  /** Wooden crate visuals over the (invisible) physics walls. */
+  private drawWoodFrame(): void {
+    const t = 14;
+    const g = this.add.graphics().setDepth(3);
+    const L = GAME.innerLeft;
+    const R = GAME.innerRight;
+    const F = GAME.floorTop;
+    const H = GAME.height;
+    // side planks: vertical gradient, plank seams, inner bevel highlight
+    for (const x of [0, R]) {
+      g.fillGradientStyle(0xc08a4e, 0xc08a4e, 0x8a5a2c, 0x8a5a2c, 1, 1, 1, 1);
+      g.fillRect(x, 0, t, F + t);
+      g.lineStyle(1.5, 0x6e4520, 0.55);
+      for (let y = 46; y < F; y += 54) g.lineBetween(x + 2, y, x + t - 2, y);
+      g.lineStyle(2, 0xe0b070, 0.85); // inner bevel light
+      const bx = x === 0 ? x + t - 1.5 : x + 1.5;
+      g.lineBetween(bx, 4, bx, F + t - 4);
+      g.lineStyle(2, 0x5e3a18, 0.9); // outer dark edge
+      const ox = x === 0 ? x + 1.5 : x + t - 1.5;
+      g.lineBetween(ox, 4, ox, F + t - 4);
+    }
+    // floor planks: horizontal gradient + seams
+    g.fillGradientStyle(0xb87f42, 0xb87f42, 0x7d5226, 0x7d5226, 1, 1, 1, 1);
+    g.fillRect(0, F, GAME.width, H - F);
+    g.lineStyle(1.5, 0x6e4520, 0.55);
+    for (let x = 52; x < GAME.width; x += 62) g.lineBetween(x, F + 3, x, H - 3);
+    g.lineStyle(2, 0xe0b070, 0.85);
+    g.lineBetween(4, F + 1.5, GAME.width - 4, F + 1.5); // top bevel light
+    g.fillStyle(0x5e3a18, 0.35); // soft contact shadow under the playfield
+    g.fillRect(L, F - 6, R - L, 6);
+    void L;
   }
 
   private buildDangerLine(): void {
     this.dangerGfx = this.add.graphics().setDepth(5);
     this.redrawDangerLine(0.45);
     this.add
-      .text(GAME.width / 2, GAME.dangerLineY - 16, STR.dangerLine, {
-        fontSize: '13px',
-        color: '#c0392b',
+      .text(GAME.width / 2, GAME.dangerLineY - 18, STR.dangerLine, {
+        fontFamily: FONT_FAMILY, fontSize: '14px', color: '#fff3d9',
+        stroke: '#a03010', strokeThickness: 4,
       })
       .setOrigin(0.5)
       .setDepth(5);
   }
 
   private redrawDangerLine(alpha: number): void {
+    // glowing ribbon: soft outer glow band + bright core line
     const g = this.dangerGfx;
     g.clear();
-    g.lineStyle(3, 0xe74c3c, alpha);
     const y = GAME.dangerLineY;
-    // dashed
-    for (let x = GAME.innerLeft + 4; x < GAME.innerRight - 14; x += 18) {
-      g.lineBetween(x, y, x + 10, y);
-    }
+    const x0 = GAME.innerLeft + 4;
+    const x1 = GAME.innerRight - 4;
+    g.fillStyle(0xff5a36, 0.35 * alpha);
+    g.fillRoundedRect(x0, y - 5, x1 - x0, 10, 5);
+    g.lineStyle(3, 0xff3b1f, Math.min(1, alpha + 0.25));
+    g.lineBetween(x0, y, x1, y);
+    g.lineStyle(1.5, 0xffd9a8, Math.min(1, alpha + 0.35));
+    g.lineBetween(x0, y - 1.5, x1, y - 1.5);
     g.setAlpha(1);
   }
 
   private buildHud(): void {
-    this.add.text(16, 8, STR.score, { fontSize: '15px', color: '#7a5a2e' });
+    this.add.text(16, 8, STR.score, {
+      fontFamily: FONT_FAMILY, fontSize: '17px', color: '#7a4a20',
+    });
     this.scoreText = this.add
-      .text(16, 24, '0', { fontSize: '30px', color: '#4a2f12', fontStyle: 'bold' });
+      .text(16, 24, '0', {
+        fontFamily: FONT_FAMILY, fontSize: '34px', color: '#fff8ea',
+        stroke: '#7a4a20', strokeThickness: 6,
+      });
 
-    this.bestText = this.add.text(150, 30, `${STR.bestScore} ${this.best}`, {
-      fontSize: '16px',
-      color: '#7a5a2e',
+    this.bestText = this.add.text(150, 32, `${STR.bestScore} ${this.best}`, {
+      fontFamily: FONT_FAMILY, fontSize: '17px', color: '#fff3d9',
+      stroke: '#7a4a20', strokeThickness: 4,
     });
 
-    this.add.text(292, 8, STR.next, { fontSize: '15px', color: '#7a5a2e' });
+    this.add.text(292, 8, STR.next, {
+      fontFamily: FONT_FAMILY, fontSize: '17px', color: '#7a4a20',
+    });
     this.nextImg = this.add.image(322, 46, 'fruit_01').setDisplaySize(38, 38);
 
     makeIconButton(this, 386, 24, STR.pauseIcon, () => this.togglePause());
@@ -544,6 +588,13 @@ export class GameScene extends Phaser.Scene {
   private addScore(n: number): void {
     this.score += n;
     this.scoreText.setText(String(this.score));
+    // juicy pop on every score change
+    this.tweens.killTweensOf(this.scoreText);
+    this.scoreText.setScale(1.25);
+    this.tweens.add({
+      targets: this.scoreText, scaleX: 1, scaleY: 1,
+      duration: 160, ease: 'Back.easeOut',
+    });
   }
 
   // ---------------- danger / game over ----------------
