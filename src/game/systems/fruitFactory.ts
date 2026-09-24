@@ -41,6 +41,10 @@ export function createFruit(
   // display size matches physics body; higher tiers look bigger
   img.setDisplaySize(r * 2, r * 2);
   img.setDepth(2);
+  // base (undeformed) scale — GameScene.updateRestingSquash() lerps the
+  // fruit's scale around this when contacts press on it
+  img.setData('baseSX', img.scaleX);
+  img.setData('baseSY', img.scaleY);
   // soft blob shadow glued under the fruit — GameScene.updateShadows() syncs
   // its position/scale/alpha every frame (no per-frame allocation)
   const shadow = scene.add.image(x, y + r, 'blob');
@@ -51,6 +55,23 @@ export function createFruit(
   img.setData('shadow', shadow);
   img.setData('shSX', shSX);
   img.setData('shSY', shSY);
+  // jelly gloss: soft top-left specular streak (depth 2.6: above the fruit,
+  // below aim guide / particles / float text). GameScene.updateShadows()
+  // syncs its position/scale/rotation every frame; counter-rotated so the
+  // light holds screen-space top-left while the fruit rolls, and scaled
+  // with the resting squash so the highlight deforms with the soft body.
+  // v3.0: spiky fruits (T2 rambutan, T10 durian) have no gloss overlay —
+  // their spike speculars carry the light; the overlay would look pasted-on.
+  if (tier !== 2 && tier !== 10) {
+    const gloss = scene.add.image(x - r * 0.3, y - r * 0.36, 'gloss');
+    gloss.setDepth(2.6).setAlpha(0.32).setRotation(-0.45);
+    const glSX = (r * 1.02) / 128;
+    const glSY = (r * 0.58) / 64;
+    gloss.setScale(glSX, glSY);
+    img.setData('gloss', gloss);
+    img.setData('glSX', glSX);
+    img.setData('glSY', glSY);
+  }
   img.setData('isFruit', true);
   img.setData('tier', tier);
   img.setData('bornAt', nowMs);
