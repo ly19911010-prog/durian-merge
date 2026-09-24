@@ -103,17 +103,18 @@ export const GAME = {
 } as const;
 
 export const FRUITS: FruitTierDef[] = [
-  // bodyFactor = measured tight-art mean diameter / 512 (v3.1) — see note above
-  { tier: 1,  tex: 'fruit_01', nameZh: '龙眼',   nameEn: 'Longan',      bodyFactor: 0.694, scoreOnCreate: 10,   color: 0xf5e6c8 },
-  { tier: 2,  tex: 'fruit_02', nameZh: '红毛丹', nameEn: 'Rambutan',    bodyFactor: 0.811, scoreOnCreate: 20,   color: 0xff5a5a },
-  { tier: 3,  tex: 'fruit_03', nameZh: '青柠',   nameEn: 'Lime',        bodyFactor: 0.856, scoreOnCreate: 40,   color: 0x9be15d },
-  { tier: 4,  tex: 'fruit_04', nameZh: '山竹',   nameEn: 'Mangosteen',  bodyFactor: 0.906, scoreOnCreate: 80,   color: 0x9b59b6 },
-  { tier: 5,  tex: 'fruit_05', nameZh: '椰子',   nameEn: 'Coconut',     bodyFactor: 0.779, scoreOnCreate: 150,  color: 0xd9c39a },
-  { tier: 6,  tex: 'fruit_06', nameZh: '柚子',   nameEn: 'Pomelo',      bodyFactor: 0.76, scoreOnCreate: 250,  color: 0xffe08a },
-  { tier: 7,  tex: 'fruit_07', nameZh: '芒果',   nameEn: 'Mango',       bodyFactor: 0.811, scoreOnCreate: 400,  color: 0xffb340 },
-  { tier: 8,  tex: 'fruit_08', nameZh: '火龙果', nameEn: 'Dragon Fruit',bodyFactor: 0.841, scoreOnCreate: 650,  color: 0xff4d88 },
-  { tier: 9,  tex: 'fruit_09', nameZh: '菠萝',   nameEn: 'Pineapple',   bodyFactor: 0.788, scoreOnCreate: 1000, color: 0xffd23f },
-  { tier: 10, tex: 'fruit_10', nameZh: '榴莲',   nameEn: 'Durian',      bodyFactor: 0.828, scoreOnCreate: 1600, color: 0x8bc34a },
+  // bodyFactor = measured max-alpha-extent / 256 (v6.0, natural premium re-render;
+  // art normalized to ~86-91% canvas fill) — see note above
+  { tier: 1,  tex: 'fruit_01', nameZh: '龙眼',   nameEn: 'Longan',      bodyFactor: 0.886, scoreOnCreate: 10,   color: 0xf5e6c8 },
+  { tier: 2,  tex: 'fruit_02', nameZh: '红毛丹', nameEn: 'Rambutan',    bodyFactor: 0.886, scoreOnCreate: 20,   color: 0xff5a5a },
+  { tier: 3,  tex: 'fruit_03', nameZh: '青柠',   nameEn: 'Lime',        bodyFactor: 0.886, scoreOnCreate: 40,   color: 0x9be15d },
+  { tier: 4,  tex: 'fruit_04', nameZh: '山竹',   nameEn: 'Mangosteen',  bodyFactor: 0.886, scoreOnCreate: 80,   color: 0x9b59b6 },
+  { tier: 5,  tex: 'fruit_05', nameZh: '椰子',   nameEn: 'Coconut',     bodyFactor: 0.886, scoreOnCreate: 150,  color: 0xd9c39a },
+  { tier: 6,  tex: 'fruit_06', nameZh: '柚子',   nameEn: 'Pomelo',      bodyFactor: 0.886, scoreOnCreate: 250,  color: 0xffe08a },
+  { tier: 7,  tex: 'fruit_07', nameZh: '芒果',   nameEn: 'Mango',       bodyFactor: 0.886, scoreOnCreate: 400,  color: 0xffb340 },
+  { tier: 8,  tex: 'fruit_08', nameZh: '火龙果', nameEn: 'Dragon Fruit', bodyFactor: 0.886, scoreOnCreate: 650,  color: 0xff4d88 },
+  { tier: 9,  tex: 'fruit_09', nameZh: '菠萝',   nameEn: 'Pineapple',   bodyFactor: 0.886, scoreOnCreate: 1000, color: 0xffd23f },
+  { tier: 10, tex: 'fruit_10', nameZh: '榴莲',   nameEn: 'Durian',      bodyFactor: 0.886, scoreOnCreate: 1600, color: 0x8bc34a },
 ];
 
 export const MAX_TIER = FRUITS.length;
