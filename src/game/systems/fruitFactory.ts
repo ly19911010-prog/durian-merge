@@ -27,9 +27,8 @@ export function createFruit(
   // colliding — the "same fruits touch but never merge" bug.)
   //
   // The body is then deliberately made slightly SMALLER than the flesh
-  // radius (× this fruit's bodyFactor, then × bodyTouchOverlap): the v13 art
-  // is centered with transparent padding removed, and each fruit's flesh
-  // fills its canvas differently (bodyFactor 0.61–0.91), so a single global
+  // radius (× this fruit's bodyFactor, then × bodyTouchOverlap): the v2.0 art
+  // was re-measured per fruit (bodyFactor 0.54–0.90), so a single global
   // factor can never be gap-free for all fruits. Per-fruit factors make the
   // flesh visually kiss on contact, while collision/merge still trigger.
   const img = scene.matter.add.image(x, y, texForTier(tier), undefined, {
