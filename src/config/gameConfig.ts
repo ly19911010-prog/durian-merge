@@ -38,12 +38,12 @@ export const GAME = {
   innerRight: 406,
   floorTop: 712,
 
-  /** fruit hangs / drops from here (below the HUD strip; big fruits need room) */
-  aimY: 130,
+  /** fruit hangs / drops from here (below the HUD strip) */
+  aimY: 77,
   /** pointer must release below this y to count as a drop (keeps HUD taps safe) */
-  dropMinY: 100,
+  dropMinY: 60,
 
-  dangerLineY: 225,
+  dangerLineY: 134,
   /** fruit must stay continuously above the line this long to end the game */
   dangerHoldMs: 2000,
   /** freshly dropped fruit gets a grace period before danger timing starts */
@@ -58,12 +58,14 @@ export const GAME = {
   /**
    * Fruit display sizes grow geometrically:
    *   diameter(i) = geoBaseDiameter × geoRatio^(i-1)
-   * tier1 (龙眼) 100px → tier10 (榴莲) ≈ 256px; geoRatio = 1.11, so every
-   * adjacent tier is ~11% bigger — clearly visible steps, and the longan is
-   * ~3x its old 34px size. Durian at ~256px fills ~65% of the 392px-wide
-   * container (close to the Suika watermelon ratio); bigger would burst the box.
+   * v2.5: geoBaseDiameter = 59.4 (= v2.4's 100 × 0.594). tier10 (durian)
+   * lands at ≈ 151.9px diameter — exactly the v2.4 tier5 (coconut) size, per
+   * the user's "coconut is the biggest" brief. Full ladder ≈
+   * 59/66/73/81/90/100/111/123/137/152px, geoRatio = 1.11 (~11% step).
+   * The smaller fruits also let the danger line move back up (134) so the
+   * game breathes again at this scale.
    */
-  geoBaseDiameter: 100,
+  geoBaseDiameter: 59.4,
   geoRatio: 1.11,
 
   /**
