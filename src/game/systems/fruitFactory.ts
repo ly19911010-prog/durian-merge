@@ -25,16 +25,32 @@ export function createFruit(
   // the body lands at exactly radius r. (Creating it at r directly would shrink
   // the body to r*(2r/512) ≈ 1px, making fruits visually overlap without ever
   // colliding — the "same fruits touch but never merge" bug.)
+  //
+  // The body is then deliberately made slightly SMALLER than the visual radius
+  // (× bodyRadiusFactor): the PNG art has transparent padding, so a 1:1 body
+  // leaves a visible gap between resting fruits. 0.92 closes the gap so the
+  // flesh visually touches on contact, while collision/merge still trigger.
   const img = scene.matter.add.image(x, y, texForTier(tier), undefined, {
-    shape: { type: 'circle', radius: 256 },
+    shape: { type: 'circle', radius: 256 * GAME.bodyRadiusFactor },
     restitution: p.restitution,
     friction: p.friction,
     frictionStatic: p.frictionStatic,
     frictionAir: p.frictionAir,
-    density: 0.0012 + tier * 0.00035,
+    density: 0.0018,
   }) as FruitGO;
   // display size matches physics body; higher tiers look bigger
   img.setDisplaySize(r * 2, r * 2);
+  img.setDepth(2);
+  // soft blob shadow glued under the fruit — GameScene.updateShadows() syncs
+  // its position/scale/alpha every frame (no per-frame allocation)
+  const shadow = scene.add.image(x, y + r, 'blob');
+  shadow.setDepth(1);
+  const shSX = (r * 1.5) / 64;
+  const shSY = (r * 0.55) / 32;
+  shadow.setScale(shSX, shSY).setAlpha(0.28);
+  img.setData('shadow', shadow);
+  img.setData('shSX', shSX);
+  img.setData('shSY', shSY);
   img.setData('isFruit', true);
   img.setData('tier', tier);
   img.setData('bornAt', nowMs);
