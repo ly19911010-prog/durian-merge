@@ -45,13 +45,20 @@ export const GAME = {
   spawnTiers: [1, 2, 3, 4] as number[],
   spawnWeights: [42, 32, 20, 6] as number[],
 
-  baseRadius: 24,
+  baseRadius: 32,
+
+  /**
+   * Physics body radius = visual (display) radius × this factor.
+   * Fruit PNGs carry transparent padding, so a 1:1 body leaves a visible
+   * gap between touching fruits; 0.92 lets the flesh visually kiss on contact.
+   */
+  bodyRadiusFactor: 0.92,
 
   physics: {
     gravityY: 1,
-    restitution: 0.15,
-    friction: 0.6,
-    frictionStatic: 1.2,
+    restitution: 0.25,
+    friction: 0.4,
+    frictionStatic: 0.8,
     frictionAir: 0.012,
   },
 
