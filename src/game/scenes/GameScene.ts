@@ -89,7 +89,9 @@ export class GameScene extends Phaser.Scene {
       }
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.matter.world.off('collisionstart');
+      // the Matter world can already be torn down at this point (e.g. Home
+      // button → scene.start('Start')); guard so the transition never throws
+      this.matter.world?.off('collisionstart');
     });
 
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
