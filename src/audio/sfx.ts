@@ -103,6 +103,10 @@ export const sfx = {
   thud(): void {
     tone(95, 0.09, { type: 'sine', vol: 0.1, slideTo: 55 });
   },
+  /** quiet squash thump when a fruit lands (paired with the squash tween) */
+  land(): void {
+    tone(140, 0.08, { type: 'sine', vol: 0.07, slideTo: 80 });
+  },
   /** Durian Burst shockwave */
   burst(): void {
     noiseBurst(0.45, 0.5, 900);
