@@ -36,12 +36,20 @@ function ok(cond, name) {
 }
 const approx = (a, b) => Math.abs(a - b) < 1e-9;
 
-// --- radius: monotonic, tier1 = 24 * 0.55 ---
-ok(approx(logic.radiusForTier(1), 13.2), 'radius tier1 = 13.2');
+// --- radius: monotonic, tier1 = 32 * 0.55 ---
+ok(approx(logic.radiusForTier(1), 17.6), 'radius tier1 = 17.6');
 let mono = true;
 for (let t = 2; t <= 10; t++) if (!(logic.radiusForTier(t) > logic.radiusForTier(t - 1))) mono = false;
 ok(mono, 'radius strictly increasing 1..10');
-ok(approx(logic.radiusForTier(10), 24 * 1.48), 'radius tier10 = 35.52');
+ok(approx(logic.radiusForTier(10), 32 * 1.48), 'radius tier10 = 47.36');
+// body slightly smaller than visual so touching fruits have no visible gap
+ok(approx(cfg.GAME.bodyRadiusFactor, 0.92), 'body radius factor = 0.92');
+// biggest spawnable fruit (tier4) fits the 392px-wide container with margin
+ok(logic.radiusForTier(4) * 2 < cfg.GAME.innerRight - cfg.GAME.innerLeft, 'tier4 diameter < container width');
+// physics "fruit feel": gentle bounce, medium friction, uniform density
+ok(approx(cfg.GAME.physics.restitution, 0.25), 'restitution = 0.25');
+ok(approx(cfg.GAME.physics.friction, 0.4), 'friction = 0.4');
+ok(approx(cfg.GAME.physics.frictionStatic, 0.8), 'frictionStatic = 0.8');
 
 // --- spawn weights [42,32,20,6] -> boundaries ---
 const pick = (r) => logic.pickSpawnTier(() => r);
