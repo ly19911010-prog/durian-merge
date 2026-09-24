@@ -45,6 +45,7 @@ export class GameScene extends Phaser.Scene {
   private cooldownUntil = 0;
   private mergeEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private juiceEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private dustEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   /** rolling particle budget: juice bursts are capped so effects stay grand
    *  but never tank the frame rate on real phones (refills 240/sec) */
   private particleBudget = 240;
@@ -52,6 +53,9 @@ export class GameScene extends Phaser.Scene {
 
   private pauseLayer: Phaser.GameObjects.Container | null = null;
   private overLayer: Phaser.GameObjects.Container | null = null;
+  /** pooled contact-AO sprites stamped at fruit-vs-fruit touch points so
+   *  resting contacts read soft instead of hard tangent circles */
+  private contactPool: Phaser.GameObjects.Image[] = [];
 
   constructor() {
     super('Game');
@@ -72,6 +76,7 @@ export class GameScene extends Phaser.Scene {
     this.buildDangerLine();
     this.buildHud();
     this.buildEmitters();
+    this.buildContactShadows();
 
     // collisions → queue, processed once per frame in update()
     this.matter.world.on('collisionstart', (event: { pairs: Array<{ bodyA: { gameObject?: unknown }; bodyB: { gameObject?: unknown } }> }) => {
@@ -79,8 +84,16 @@ export class GameScene extends Phaser.Scene {
         const a = this.fruitFromBody(pair.bodyA.gameObject);
         const b = this.fruitFromBody(pair.bodyB.gameObject);
         if (a && b) {
-          this.maybeThud();
-          this.maybeImpactSquash(a, b, pair.bodyA as MatterJS.BodyType, pair.bodyB as MatterJS.BodyType);
+          const ba = pair.bodyA as MatterJS.BodyType;
+          const bb = pair.bodyB as MatterJS.BodyType;
+          const rvx = ba.velocity.x - bb.velocity.x;
+          const rvy = ba.velocity.y - bb.velocity.y;
+          const relSpeed = Math.sqrt(rvx * rvx + rvy * rvy);
+          // 0..1 impact factor shared by squash, dust and thud
+          const impact = Math.max(0, Math.min(1, (relSpeed - 4) / 22));
+          this.maybeImpactThud(impact);
+          this.maybeImpactSquash(a, b, ba, bb);
+          this.maybeDust(a, b, impact);
           this.pendingMerges.push([a, b]);
         }
         // landing squash when a fruit first strikes the floor or the pile
@@ -246,6 +259,72 @@ export class GameScene extends Phaser.Scene {
       emitting: false,
     });
     this.juiceEmitter.setDepth(19);
+    // impact dust: tiny cream puffs at contact points, same 'dot' texture as
+    // the juice system. explode() is one-shot; counts are scaled per impact
+    // in maybeDust(), so resting piles never spam particles.
+    this.dustEmitter = this.add.particles(0, 0, 'dot', {
+      speed: { min: 25, max: 110 },
+      angle: { min: 0, max: 360 },
+      gravityY: -60,
+      lifespan: { min: 220, max: 420 },
+      scale: { start: 0.22, end: 0 },
+      alpha: { start: 0.55, end: 0 },
+      tint: 0xfff3df,
+      quantity: 0,
+      emitting: false,
+    });
+    this.dustEmitter.setDepth(18);
+  }
+
+  /** Pool of contact-AO sprites (depth 1.5: above blob shadows, below fruits).
+   *  Allocation-free: 28 sprites created once, repositioned every frame. */
+  private buildContactShadows(): void {
+    for (let i = 0; i < 28; i++) {
+      const s = this.add.image(-100, -100, 'contactAO');
+      s.setDepth(1.5).setVisible(false);
+      this.contactPool.push(s);
+    }
+  }
+
+  /** Stamp a soft AO blob at every live fruit-vs-fruit contact point.
+   *  Reads Matter's active pair list (no O(n^2) scan); the shadow sits in the
+   *  crevice between the two circles with its long axis along the tangent,
+   *  which kills the "hard tangent circles" look when fruits pile up. */
+  private updateContactShadows(): void {
+    let used = 0;
+    const pool = this.contactPool;
+    const pairs = (this.matter.world.engine.pairs?.list ?? []) as Array<{
+      bodyA: { gameObject?: unknown };
+      bodyB: { gameObject?: unknown };
+      isActive?: boolean;
+    }>;
+    for (const pair of pairs) {
+      if (used >= pool.length) break;
+      if (pair.isActive === false) continue;
+      const a = pair.bodyA.gameObject as FruitGO | undefined;
+      const b = pair.bodyB.gameObject as FruitGO | undefined;
+      if (!a?.active || !b?.active) continue;
+      if (!a.getData('isFruit') || !b.getData('isFruit')) continue;
+      if (a.getData('merging') || b.getData('merging')) continue;
+      if (a.getData('popping') || b.getData('popping')) continue;
+      const r1 = radiusForTier(a.getData('tier') as number);
+      const r2 = radiusForTier(b.getData('tier') as number);
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < 0.01) continue;
+      // contact point on the line between centers, weighted by visual radii
+      const t = r1 / (r1 + r2);
+      const px = a.x + dx * t;
+      const py = a.y + dy * t;
+      const rm = Math.min(r1, r2);
+      const s = pool[used++];
+      s.setVisible(true);
+      s.setPosition(px, py);
+      s.setRotation(Math.atan2(dy, dx) + Math.PI / 2);
+      s.setScale((rm * 1.15) / 64, (rm * 0.5) / 32);
+    }
+    for (let i = used; i < pool.length; i++) pool[i].setVisible(false);
   }
 
   // ---------------- aiming & dropping ----------------
@@ -319,45 +398,85 @@ export class GameScene extends Phaser.Scene {
     return go;
   }
 
-  private maybeThud(): void {
+  /** Impact-scaled contact thud (90ms throttle): gentle tap → heavy knock. */
+  private maybeImpactThud(intensity: number): void {
     const now = this.time.now;
     if (now - this.lastThudAt < 90) return;
     this.lastThudAt = now;
-    sfx.thud();
+    sfx.impact(intensity);
   }
 
-  /** Light squash on hard fruit-vs-fruit impacts (not just first landings).
-   *  Per-fruit 450ms cooldown + 'squashing' guard keep tween spam at zero;
-   *  popIn/merge tweens own the scale while 'popping', so we stay out. */
+  /** Directional squash & stretch on fruit-vs-fruit impacts.
+   *  Squash axis follows the collision normal (2-axis approximation: pick the
+   *  dominant world axis — no rotation juggling, so it never fights the Matter
+   *  body sync), magnitude scales with impact speed: light touches do nothing,
+   *  hard slams visibly deform. Two-phase: fast squash-in, then spring back
+   *  with Back.easeOut. Per-fruit 350ms cooldown + 'squashing' guard keep
+   *  tween spam at zero; popIn/merge tweens own the scale while 'popping'. */
   private maybeImpactSquash(a: FruitGO, b: FruitGO, bodyA: MatterJS.BodyType, bodyB: MatterJS.BodyType): void {
     const rvx = bodyA.velocity.x - bodyB.velocity.x;
     const rvy = bodyA.velocity.y - bodyB.velocity.y;
-    if (rvx * rvx + rvy * rvy < 25) return; // relative speed < 5: too soft to read
+    const relSpeed = Math.sqrt(rvx * rvx + rvy * rvy);
+    if (relSpeed < 4) return; // too soft to read
+    // 0..1 impact factor: ramps in over speeds 4..26
+    const k = Math.min(1, (relSpeed - 4) / 22);
+    // collision normal (A → B); squash along the dominant axis
+    let nx = b.x - a.x;
+    let ny = b.y - a.y;
+    const nl = Math.hypot(nx, ny) || 1;
+    nx /= nl;
+    ny /= nl;
+    const horizontal = Math.abs(nx) >= Math.abs(ny);
     const now = this.time.now;
     const pair: Array<FruitGO> = [a, b];
     for (const f of pair) {
       if (!f.active || f.getData('popping') || f.getData('squashing') || f.getData('merging')) continue;
       const last = (f.getData('lastSquash') as number) || 0;
-      if (now - last < 450) continue;
+      if (now - last < 350) continue;
       f.setData('lastSquash', now);
       f.setData('squashing', true);
       const sx = f.scaleX;
       const sy = f.scaleY;
+      const squash = 1 - 0.3 * k;
+      const stretch = 1 + 0.21 * k;
+      const midX = horizontal ? sx * squash : sx * stretch;
+      const midY = horizontal ? sy * stretch : sy * squash;
       this.tweens.add({
         targets: f,
-        scaleX: sx * 1.1,
-        scaleY: sy * 0.88,
-        duration: 80,
-        ease: 'Quad.easeOut',
-        yoyo: true,
+        scaleX: midX,
+        scaleY: midY,
+        duration: 70,
+        ease: 'Quad.easeIn',
         onComplete: () => {
-          if (f.active) {
-            f.setScale(sx, sy);
-            f.setData('squashing', false);
-          }
+          if (!f.active) return;
+          this.tweens.add({
+            targets: f,
+            scaleX: sx,
+            scaleY: sy,
+            duration: 280,
+            ease: 'Back.easeOut',
+            onComplete: () => {
+              if (f.active) {
+                f.setScale(sx, sy);
+                f.setData('squashing', false);
+              }
+            },
+          });
         },
       });
     }
+  }
+
+  /** Dust puff at the contact point, scaled by impact 0..1. Fired from
+   *  collisionstart only (resting piles don't re-fire), so no spam. */
+  private maybeDust(a: FruitGO, b: FruitGO, intensity: number): void {
+    if (intensity <= 0) return;
+    const r1 = radiusForTier(a.getData('tier') as number);
+    const r2 = radiusForTier(b.getData('tier') as number);
+    const t = r1 / (r1 + r2);
+    const px = a.x + (b.x - a.x) * t;
+    const py = a.y + (b.y - a.y) * t;
+    this.dustEmitter.explode(Math.round(2 + 6 * intensity), px, py);
   }
 
   /** Squash & stretch when a fruit first lands on the floor or the pile. */
@@ -382,9 +501,9 @@ export class GameScene extends Phaser.Scene {
     // as soft-fruit impact and settles back exactly.
     this.tweens.add({
       targets: fruit,
-      scaleX: sx * 1.18,
-      scaleY: sy * 0.78,
-      duration: 90,
+      scaleX: sx * 1.24,
+      scaleY: sy * 0.74,
+      duration: 100,
       ease: 'Quad.easeOut',
       yoyo: true,
       onComplete: () => {
@@ -811,6 +930,7 @@ export class GameScene extends Phaser.Scene {
     this.processMerges();
     this.checkDanger(time);
     this.updateShadows();
+    this.updateContactShadows();
   }
 
   /** Sync each fruit's blob shadow: glued under the fruit, shrinking and
