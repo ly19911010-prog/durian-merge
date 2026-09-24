@@ -103,6 +103,16 @@ export const sfx = {
   thud(): void {
     tone(95, 0.09, { type: 'sine', vol: 0.1, slideTo: 55 });
   },
+  /** contact thud scaled by impact intensity 0..1: gentle tap → heavy knock.
+   *  Sine pitch drop; louder + slightly lower when harder. */
+  impact(intensity: number): void {
+    const k = Math.max(0, Math.min(1, intensity));
+    tone(150 - 40 * k, 0.1 + 0.06 * k, {
+      type: 'sine',
+      vol: 0.05 + 0.17 * k,
+      slideTo: 60,
+    });
+  },
   /** quiet squash thump when a fruit lands (paired with the squash tween) */
   land(): void {
     tone(140, 0.08, { type: 'sine', vol: 0.07, slideTo: 80 });
