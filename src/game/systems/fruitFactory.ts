@@ -1,6 +1,6 @@
 /** Fruit entity factory — creates physics fruits with consistent visuals/body. */
 import Phaser from 'phaser';
-import { GAME, texForTier, radiusForTier } from '../../config/gameConfig';
+import { GAME, texForTier, radiusForTier, bodyFactorForTier } from '../../config/gameConfig';
 
 export type FruitGO = Phaser.Physics.Matter.Image;
 
@@ -26,12 +26,14 @@ export function createFruit(
   // the body to r*(2r/512) ≈ 1px, making fruits visually overlap without ever
   // colliding — the "same fruits touch but never merge" bug.)
   //
-  // The body is then deliberately made slightly SMALLER than the visual radius
-  // (× bodyRadiusFactor): the PNG art has transparent padding, so a 1:1 body
-  // leaves a visible gap between resting fruits. 0.92 closes the gap so the
-  // flesh visually touches on contact, while collision/merge still trigger.
+  // The body is then deliberately made slightly SMALLER than the flesh
+  // radius (× this fruit's bodyFactor, then × bodyTouchOverlap): the v13 art
+  // is centered with transparent padding removed, and each fruit's flesh
+  // fills its canvas differently (bodyFactor 0.61–0.91), so a single global
+  // factor can never be gap-free for all fruits. Per-fruit factors make the
+  // flesh visually kiss on contact, while collision/merge still trigger.
   const img = scene.matter.add.image(x, y, texForTier(tier), undefined, {
-    shape: { type: 'circle', radius: 256 * GAME.bodyRadiusFactor },
+    shape: { type: 'circle', radius: 256 * bodyFactorForTier(tier) * GAME.bodyTouchOverlap },
     restitution: p.restitution,
     friction: p.friction,
     frictionStatic: p.frictionStatic,
