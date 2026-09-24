@@ -15,7 +15,7 @@ function createGame(): void {
   // crisp on retina / high-DPI screens (the 420x740 logical canvas is CSS-scaled
   // by Phaser.Scale.FIT; without zoom the backing store is 1x and looks blurry).
   // Game logic keeps using 420x740 coordinates; only the raster is denser.
-  // zoom caps at 3: a tier-10 fruit displays at ~95px logical → ~285px raster,
+  // zoom caps at 3: a tier-10 fruit displays at ~118px logical → ~355px raster,
   // still under the 512px texture, so no upscaling blur.
   scale: {
     mode: Phaser.Scale.FIT,
