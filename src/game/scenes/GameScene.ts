@@ -208,10 +208,10 @@ export class GameScene extends Phaser.Scene {
     this.enforceCap();
     this.maxTierReached = Math.max(this.maxTierReached, tier);
 
+    this.tweens.killTweensOf(this.aimImg);
     this.aimImg.destroy();
     this.aimImg = null;
     sfx.drop();
-
     this.currentTier = this.nextTier;
     this.nextTier = pickSpawnTier(Math.random);
     this.updateNextPreview();
@@ -320,6 +320,10 @@ export class GameScene extends Phaser.Scene {
   private removeFruit(f: FruitGO): void {
     const i = this.fruits.indexOf(f);
     if (i >= 0) this.fruits.splice(i, 1);
+    // a chained merge can destroy a fruit while its pop tween is still
+    // running — kill tweens first, otherwise the tween writes scale to a
+    // dead Matter body and throws.
+    this.tweens.killTweensOf(f);
     f.destroy();
   }
 
@@ -406,7 +410,8 @@ export class GameScene extends Phaser.Scene {
       this.bestText.setText(`${STR.bestScore} ${this.best}`);
     }
     if (this.aimImg) {
-      this.aimImg.destroy();
+      this.tweens.killTweensOf(this.aimImg);
+    this.aimImg.destroy();
       this.aimImg = null;
     }
     this.aimGuide.clear();
