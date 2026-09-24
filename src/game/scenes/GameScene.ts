@@ -53,9 +53,6 @@ export class GameScene extends Phaser.Scene {
 
   private pauseLayer: Phaser.GameObjects.Container | null = null;
   private overLayer: Phaser.GameObjects.Container | null = null;
-  /** pooled contact-AO sprites stamped at fruit-vs-fruit touch points so
-   *  resting contacts read soft instead of hard tangent circles */
-  private contactPool: Phaser.GameObjects.Image[] = [];
 
   constructor() {
     super('Game');
@@ -76,7 +73,6 @@ export class GameScene extends Phaser.Scene {
     this.buildDangerLine();
     this.buildHud();
     this.buildEmitters();
-    this.buildContactShadows();
 
     // collisions → queue, processed once per frame in update()
     this.matter.world.on('collisionstart', (event: { pairs: Array<{ bodyA: { gameObject?: unknown }; bodyB: { gameObject?: unknown } }> }) => {
@@ -274,58 +270,9 @@ export class GameScene extends Phaser.Scene {
     this.dustEmitter.setDepth(18);
   }
 
-  /** Pool of contact-AO sprites (depth 1.5: above blob shadows, below fruits).
-   *  Allocation-free: 40 sprites created once, repositioned every frame. */
-  private buildContactShadows(): void {
-    for (let i = 0; i < 40; i++) {
-      const s = this.add.image(-100, -100, 'contactAO');
-      s.setDepth(1.5).setVisible(false);
-      this.contactPool.push(s);
-    }
-  }
-
-  /** Stamp a soft AO blob at every live fruit-vs-fruit contact point.
-   *  Reads Matter's active pair list (no O(n^2) scan); the shadow sits in the
-   *  crevice between the two circles with its long axis along the tangent,
-   *  which kills the "hard tangent circles" look when fruits pile up. */
-  private updateContactShadows(): void {
-    let used = 0;
-    const pool = this.contactPool;
-    const pairs = (this.matter.world.engine.pairs?.list ?? []) as Array<{
-      bodyA: { gameObject?: unknown };
-      bodyB: { gameObject?: unknown };
-      isActive?: boolean;
-    }>;
-    for (const pair of pairs) {
-      if (used >= pool.length) break;
-      if (pair.isActive === false) continue;
-      const a = pair.bodyA.gameObject as FruitGO | undefined;
-      const b = pair.bodyB.gameObject as FruitGO | undefined;
-      if (!a?.active || !b?.active) continue;
-      if (!a.getData('isFruit') || !b.getData('isFruit')) continue;
-      if (a.getData('merging') || b.getData('merging')) continue;
-      if (a.getData('popping') || b.getData('popping')) continue;
-      const r1 = radiusForTier(a.getData('tier') as number);
-      const r2 = radiusForTier(b.getData('tier') as number);
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 < 0.01) continue;
-      // contact point on the line between centers, weighted by visual radii
-      const t = r1 / (r1 + r2);
-      const px = a.x + dx * t;
-      const py = a.y + dy * t;
-      const rm = Math.min(r1, r2);
-      const s = pool[used++];
-      s.setVisible(true);
-      s.setPosition(px, py);
-      s.setRotation(Math.atan2(dy, dx) + Math.PI / 2);
-      // v2.5: ~25% larger than before so piled fruits read as nestling into
-      // each other — part of the "not stickers" brief
-      s.setScale((rm * 1.4) / 64, (rm * 0.66) / 32);
-    }
-    for (let i = used; i < pool.length; i++) pool[i].setVisible(false);
-  }
+  /**
+   * (contact-AO shadows removed 2026-09-24 per Ly: no shadow stamped at
+   * fruit-vs-fruit contact points — touching fruits should read clean.)
 
   /**
    * Resting contact squash — the soft-body half of the "not stickers" brief.
@@ -1011,7 +958,6 @@ export class GameScene extends Phaser.Scene {
     this.processMerges();
     this.checkDanger(time);
     this.updateShadows();
-    this.updateContactShadows();
     this.updateRestingSquash(delta);
   }
 
