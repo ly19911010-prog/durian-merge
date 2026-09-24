@@ -38,7 +38,7 @@ export const GAME = {
   /** container inner bounds (walls) */
   innerLeft: 14,
   innerRight: 406,
-  floorTop: 712,
+  floorTop: 690,
 
   /** fruit hangs / drops from here (below the HUD strip) */
   aimY: 77,
@@ -66,9 +66,14 @@ export const GAME = {
    * 59/66/73/81/90/100/111/123/137/152px, geoRatio = 1.11 (~11% step).
    * The smaller fruits also let the danger line move back up (134) so the
    * game breathes again at this scale.
+   * v6.1: user felt adjacent tiers looked the same size — spread the ladder:
+   * geoBaseDiameter = 52, geoRatio = 1.14 (~14% step). Full ladder ≈
+   * 52/59/68/77/88/100/114/130/148/169px. Tier 10 stays box-friendly
+   * (169px in a 392px-wide box); floorTop moved up 712 → 690 to make room
+   * for the bottom evolution bar.
    */
-  geoBaseDiameter: 59.4,
-  geoRatio: 1.11,
+  geoBaseDiameter: 52,
+  geoRatio: 1.14,
 
   /**
    * Body radius = visual radius × this fruit's bodyFactor × this overlap.
