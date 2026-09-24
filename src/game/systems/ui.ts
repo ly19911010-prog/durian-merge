@@ -5,6 +5,28 @@ import { sfx } from '../../audio/sfx';
 export const FONT_FAMILY =
   '"ZCOOL KuaiLe","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif';
 
+/**
+ * Crisp text on high-DPI phones: Phaser Text bakes its glyphs at
+ * resolution 1 by default, which goes blurry when the 420x740 canvas is
+ * CSS-scaled on dpr=3 devices. Bake at the device ratio (capped at 3) so
+ * HUD/score/labels stay sharp. All game text must go through makeText.
+ */
+export function textResolution(): number {
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  return Math.min(dpr, 3);
+}
+
+/** scene.add.text with device-pixel resolution baked in. */
+export function makeText(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  str: string,
+  style: Phaser.Types.GameObjects.Text.TextStyle = {},
+): Phaser.GameObjects.Text {
+  return scene.add.text(x, y, str, { ...style, resolution: textResolution() });
+}
+
 export interface ButtonOpts {
   fontSize?: number;
   fill?: number;
@@ -52,8 +74,7 @@ export function makeButton(
   // rim
   g.lineStyle(3, edge, 1);
   g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
-  const txt = scene.add
-    .text(0, 1, label, {
+  const txt = makeText(scene, 0, 1, label, {
       fontFamily: FONT_FAMILY,
       fontSize: `${opts.fontSize ?? 26}px`,
       color: opts.textColor ?? '#5b2a00',
@@ -83,8 +104,7 @@ export function makeIconButton(
   label: string,
   onClick: () => void,
 ): Phaser.GameObjects.Text {
-  const t = scene.add
-    .text(x, y, label, { fontSize: '26px' })
+  const t = makeText(scene, x, y, label, { fontSize: '26px' })
     .setOrigin(0.5)
     .setInteractive({ useHandCursor: true })
     .setPadding(6, 4, 6, 4);
