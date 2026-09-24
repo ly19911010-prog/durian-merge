@@ -5,7 +5,7 @@ import { StartScene } from './game/scenes/StartScene';
 import { GameScene } from './game/scenes/GameScene';
 
 const game = new Phaser.Game({
-  type: Phaser.AUTO,
+  type: Phaser.WEBGL,
   width: GAME.width,
   height: GAME.height,
   parent: 'game-root',
@@ -14,10 +14,20 @@ const game = new Phaser.Game({
   // crisp on retina / high-DPI screens (the 420x740 logical canvas is CSS-scaled
   // by Phaser.Scale.FIT; without zoom the backing store is 1x and looks blurry).
   // Game logic keeps using 420x740 coordinates; only the raster is denser.
+  // zoom caps at 3: a tier-10 fruit displays at ~95px logical → ~285px raster,
+  // still under the 512px texture, so no upscaling blur.
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    zoom: Math.min(window.devicePixelRatio || 1, 2),
+    zoom: Math.min(window.devicePixelRatio || 1, 3),
+  },
+  render: {
+    antialias: true,
+    roundPixels: false, // sub-pixel motion reads smoother on phones
+    powerPreference: 'high-performance',
+  },
+  fps: {
+    target: 60,
   },
   physics: {
     default: 'matter',
