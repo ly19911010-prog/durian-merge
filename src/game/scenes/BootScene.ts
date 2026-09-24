@@ -3,17 +3,19 @@ import Phaser from 'phaser';
 import { GAME } from '../../config/gameConfig';
 import { STR } from '../../config/strings';
 
+// v2.4: _v24 files are the v2.3 de-fringed art, renamed for cache-busting
+// (phone browsers cached the old fruit_XX.png / fruit_XX_<name>.png URLs).
 const FRUIT_FILES: Array<[string, string]> = [
-  ['fruit_01', 'assets/fruits/fruit_01_longan.png'],
-  ['fruit_02', 'assets/fruits/fruit_02_rambutan.png'],
-  ['fruit_03', 'assets/fruits/fruit_03_lime.png'],
-  ['fruit_04', 'assets/fruits/fruit_04_mangosteen.png'],
-  ['fruit_05', 'assets/fruits/fruit_05_coconut.png'],
-  ['fruit_06', 'assets/fruits/fruit_06_pomelo.png'],
-  ['fruit_07', 'assets/fruits/fruit_07_mango.png'],
-  ['fruit_08', 'assets/fruits/fruit_08_dragonfruit.png'],
-  ['fruit_09', 'assets/fruits/fruit_09_pineapple.png'],
-  ['fruit_10', 'assets/fruits/fruit_10_durian.png'],
+  ['fruit_01', 'assets/fruits/fruit_01_v24.png'],
+  ['fruit_02', 'assets/fruits/fruit_02_v24.png'],
+  ['fruit_03', 'assets/fruits/fruit_03_v24.png'],
+  ['fruit_04', 'assets/fruits/fruit_04_v24.png'],
+  ['fruit_05', 'assets/fruits/fruit_05_v24.png'],
+  ['fruit_06', 'assets/fruits/fruit_06_v24.png'],
+  ['fruit_07', 'assets/fruits/fruit_07_v24.png'],
+  ['fruit_08', 'assets/fruits/fruit_08_v24.png'],
+  ['fruit_09', 'assets/fruits/fruit_09_v24.png'],
+  ['fruit_10', 'assets/fruits/fruit_10_v24.png'],
 ];
 
 export class BootScene extends Phaser.Scene {
@@ -50,6 +52,17 @@ export class BootScene extends Phaser.Scene {
       g.fillEllipse(32, 16, 60 * s, 28 * s);
     }
     g.generateTexture('blob', 64, 32);
+    // contact AO (64x32): softer, more falloff layers than the blob shadow.
+    // GameScene.updateContactShadows() stamps these at fruit-vs-fruit contact
+    // points so touching fruits read as nestling instead of hard tangent
+    // circles. Darker core baked in; sprites run at alpha 1.
+    g.clear();
+    for (let i = 0; i < 8; i++) {
+      const s = 1 - i * 0.1;
+      g.fillStyle(0x201004, 0.055);
+      g.fillEllipse(32, 16, 62 * s, 30 * s);
+    }
+    g.generateTexture('contactAO', 64, 32);
     // ring for durian-burst shockwave — generated at 256px because the
     // shockwave scales it up ~1.6x; the old 64px version upscaled 6.4x and
     // looked blurry (GameScene.shockwave divides by 256 now)
