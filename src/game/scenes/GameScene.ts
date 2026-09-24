@@ -223,7 +223,7 @@ export class GameScene extends Phaser.Scene {
     this.add.text(292, 8, STR.next, {
       fontFamily: FONT_FAMILY, fontSize: '17px', color: '#7a4a20',
     });
-    this.nextImg = this.add.image(322, 46, 'fruit_01').setDisplaySize(38, 38);
+    this.nextImg = this.add.image(322, 46, 'fruit_01').setDisplaySize(64, 64);
 
     makeIconButton(this, 386, 24, STR.pauseIcon, () => this.togglePause());
     this.soundBtn = makeIconButton(this, 386, 58, sfx.isMuted() ? STR.soundOff : STR.soundOn, () => {
@@ -369,7 +369,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateNextPreview(): void {
-    this.nextImg.setTexture(FRUITS[this.nextTier - 1].tex).setDisplaySize(38, 38);
+    this.nextImg.setTexture(FRUITS[this.nextTier - 1].tex).setDisplaySize(64, 64);
   }
 
   private enforceCap(): void {
