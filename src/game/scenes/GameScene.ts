@@ -40,9 +40,14 @@ export class GameScene extends Phaser.Scene {
   private bestText!: Phaser.GameObjects.Text;
   private soundBtn!: Phaser.GameObjects.Text;
   private dangerGfx!: Phaser.GameObjects.Graphics;
+  private lastDangerBucket = -1;
 
   private cooldownUntil = 0;
   private mergeEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private juiceEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  /** rolling particle budget: juice bursts are capped so effects stay grand
+   *  but never tank the frame rate on real phones (refills 240/sec) */
+  private particleBudget = 240;
   private lastThudAt = 0;
 
   private pauseLayer: Phaser.GameObjects.Container | null = null;
@@ -75,6 +80,7 @@ export class GameScene extends Phaser.Scene {
         const b = this.fruitFromBody(pair.bodyB.gameObject);
         if (a && b) {
           this.maybeThud();
+          this.maybeImpactSquash(a, b, pair.bodyA as MatterJS.BodyType, pair.bodyB as MatterJS.BodyType);
           this.pendingMerges.push([a, b]);
         }
         // landing squash when a fruit first strikes the floor or the pile
@@ -170,15 +176,30 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildEmitters(): void {
+    // one reusable emitter for all merge/burst particles — explode() reuses
+    // the same emitter, so merges never allocate new particle systems
     this.mergeEmitter = this.add.particles(0, 0, 'dot', {
       speed: { min: 90, max: 280 },
       angle: { min: 0, max: 360 },
       lifespan: { min: 300, max: 600 },
-      scale: { start: 0.9, end: 0 },
+      scale: { start: 0.3, end: 0 }, // 48px dot texture → ~14px particles
       quantity: 0,
       emitting: false,
     });
     this.mergeEmitter.setDepth(20);
+    // juice droplets: same reusable-emitter pattern, but with gravity so the
+    // splash arcs and falls like real juice; tinted per merge, count scaled
+    // by tier and hard-capped by particleBudget in doMergeSpawn
+    this.juiceEmitter = this.add.particles(0, 0, 'dot', {
+      speed: { min: 120, max: 420 },
+      angle: { min: 0, max: 360 },
+      gravityY: 900,
+      lifespan: { min: 350, max: 750 },
+      scale: { start: 0.32, end: 0 },
+      quantity: 0,
+      emitting: false,
+    });
+    this.juiceEmitter.setDepth(19);
   }
 
   // ---------------- aiming & dropping ----------------
@@ -206,7 +227,8 @@ export class GameScene extends Phaser.Scene {
     const r = radiusForTier(tier);
     const x = clampDropX(this.aimX, r);
     const fruit = createFruit(this, x, GAME.aimY, tier, now);
-    fruit.setVelocity(0, 2.5);
+    // slight downward kick on release so the drop feels decisive
+    fruit.setVelocity(0, 4);
     this.fruits.push(fruit);
     this.enforceCap();
     this.maxTierReached = Math.max(this.maxTierReached, tier);
@@ -258,6 +280,40 @@ export class GameScene extends Phaser.Scene {
     sfx.thud();
   }
 
+  /** Light squash on hard fruit-vs-fruit impacts (not just first landings).
+   *  Per-fruit 450ms cooldown + 'squashing' guard keep tween spam at zero;
+   *  popIn/merge tweens own the scale while 'popping', so we stay out. */
+  private maybeImpactSquash(a: FruitGO, b: FruitGO, bodyA: MatterJS.BodyType, bodyB: MatterJS.BodyType): void {
+    const rvx = bodyA.velocity.x - bodyB.velocity.x;
+    const rvy = bodyA.velocity.y - bodyB.velocity.y;
+    if (rvx * rvx + rvy * rvy < 25) return; // relative speed < 5: too soft to read
+    const now = this.time.now;
+    const pair: Array<FruitGO> = [a, b];
+    for (const f of pair) {
+      if (!f.active || f.getData('popping') || f.getData('squashing') || f.getData('merging')) continue;
+      const last = (f.getData('lastSquash') as number) || 0;
+      if (now - last < 450) continue;
+      f.setData('lastSquash', now);
+      f.setData('squashing', true);
+      const sx = f.scaleX;
+      const sy = f.scaleY;
+      this.tweens.add({
+        targets: f,
+        scaleX: sx * 1.1,
+        scaleY: sy * 0.88,
+        duration: 80,
+        ease: 'Quad.easeOut',
+        yoyo: true,
+        onComplete: () => {
+          if (f.active) {
+            f.setScale(sx, sy);
+            f.setData('squashing', false);
+          }
+        },
+      });
+    }
+  }
+
   /** Squash & stretch when a fruit first lands on the floor or the pile. */
   private maybeLandSquash(fruit: FruitGO | null, otherGO: unknown): void {
     if (!fruit || !fruit.body || fruit.getData('hasLanded')) return;
@@ -293,10 +349,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private processMerges(): void {
-    if (this.pendingMerges.length === 0) return;
-    const queue = this.pendingMerges;
-    this.pendingMerges = [];
-    for (const [a, b] of queue) {
+    const n = this.pendingMerges.length;
+    if (n === 0) return;
+    // iterate in place and reset length — no per-frame array allocation
+    for (let i = 0; i < n; i++) {
+      const a = this.pendingMerges[i][0];
+      const b = this.pendingMerges[i][1];
       if (!a.active || !b.active) continue;
       if (a.getData('merging') || b.getData('merging')) continue;
       const ta = a.getData('tier') as number;
@@ -317,23 +375,76 @@ export class GameScene extends Phaser.Scene {
         this.doDurianBurst(mx, my);
       }
     }
+    // reuse the queue array instead of allocating a fresh one each frame
+    this.pendingMerges.length = 0;
   }
 
   private doMergeSpawn(newTier: number, x: number, y: number): void {
     const now = this.time.now;
     const fruit = createFruit(this, x, y, newTier, now);
+    // "squeezed out" feel: a tiny upward hop on birth (popIn adds the scale pop)
+    fruit.setVelocity(0, -1.8);
     this.fruits.push(fruit);
     this.enforceCap();
     this.maxTierReached = Math.max(this.maxTierReached, newTier);
 
+    const color = FRUITS[newTier - 1].color;
     const gained = mergeScoreForTier(newTier);
     this.addScore(gained);
     this.floatText(x, y - radiusForTier(newTier) - 6, `+${gained}`, '#e67e22', 22);
 
-    this.mergeEmitter.setParticleTint(FRUITS[newTier - 1].color);
+    // juice splash: droplet count scales with tier, hard-capped by the rolling
+    // particle budget so the effect stays grand without dropping frames
+    const want = Math.min(12 + newTier * 4, 48);
+    const n = Math.min(want, Math.floor(this.particleBudget));
+    this.particleBudget -= n;
+    if (n > 0) {
+      this.juiceEmitter.setParticleTint(color);
+      this.juiceEmitter.explode(n, x, y);
+    }
+    this.mergeRing(x, y, newTier, color);
+
+    // big merges (tier 7+) get a whisper of drama: subtle shake + soft flash
+    if (newTier >= 7) {
+      this.cameras.main.shake(130, 0.0035);
+      const flash = this.add
+        .rectangle(0, 0, GAME.width, GAME.height, 0xffffff)
+        .setOrigin(0)
+        .setAlpha(0.16)
+        .setDepth(60);
+      this.tweens.add({
+        targets: flash,
+        alpha: 0,
+        duration: 200,
+        ease: 'Quad.easeOut',
+        onComplete: () => flash.destroy(),
+      });
+    }
+
+    this.mergeEmitter.setParticleTint(color);
     this.mergeEmitter.explode(16, x, y);
     popIn(this, fruit);
     sfx.merge(newTier);
+  }
+
+  /** Expanding light ring on merge, tinted with the new fruit's color. */
+  private mergeRing(x: number, y: number, tier: number, color: number): void {
+    const ring = this.add
+      .image(x, y, 'ring')
+      .setDepth(21)
+      .setTint(color)
+      .setAlpha(0.85)
+      .setScale(0.15);
+    const target = (radiusForTier(tier) * 3.2) / 256; // 'ring' texture is 256px
+    this.tweens.add({
+      targets: ring,
+      scaleX: target,
+      scaleY: target,
+      alpha: 0,
+      duration: 320,
+      ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    });
   }
 
   private doDurianBurst(x: number, y: number): void {
@@ -357,6 +468,9 @@ export class GameScene extends Phaser.Scene {
   private removeFruit(f: FruitGO): void {
     const i = this.fruits.indexOf(f);
     if (i >= 0) this.fruits.splice(i, 1);
+    // the blob shadow is a separate GameObject — destroy it with the fruit
+    const sh = f.getData('shadow') as Phaser.GameObjects.Image | undefined;
+    if (sh && sh.active) sh.destroy();
     // a chained merge can destroy a fruit while its pop tween is still
     // running — kill tweens first, otherwise the tween writes scale to a
     // dead Matter body and throws.
@@ -376,7 +490,26 @@ export class GameScene extends Phaser.Scene {
         strokeThickness: 4,
       })
       .setOrigin(0.5)
-      .setDepth(30);
+      .setDepth(30)
+      .setScale(0.55);
+    // bouncy scale pop, then drift up and fade
+    this.tweens.add({
+      targets: t,
+      scaleX: 1.18,
+      scaleY: 1.18,
+      duration: 170,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        if (!t.active) return;
+        this.tweens.add({
+          targets: t,
+          scaleX: 1,
+          scaleY: 1,
+          duration: 130,
+          ease: 'Quad.easeOut',
+        });
+      },
+    });
     this.tweens.add({
       targets: t,
       y: y - 46,
@@ -394,7 +527,7 @@ export class GameScene extends Phaser.Scene {
 
   private shockwave(x: number, y: number): void {
     const ring = this.add.image(x, y, 'ring').setDepth(25).setAlpha(0.95).setTint(0xffd23f);
-    const target = (GAME.burst.radius * 2.4) / 64;
+    const target = (GAME.burst.radius * 2.4) / 256; // 'ring' texture is 256px
     this.tweens.add({
       targets: ring,
       scaleX: target,
@@ -431,7 +564,13 @@ export class GameScene extends Phaser.Scene {
       }
     }
     const pulse = anyInZone ? 0.55 + 0.4 * Math.abs(Math.sin(now / 130)) : 0.45;
-    this.redrawDangerLine(pulse);
+    // skip redundant graphics redraws: the idle pulse is constant, so only
+    // redraw when the quantized alpha bucket actually changes
+    const bucket = Math.round(pulse * 40);
+    if (bucket !== this.lastDangerBucket) {
+      this.lastDangerBucket = bucket;
+      this.redrawDangerLine(pulse);
+    }
   }
 
   private gameOver(): void {
@@ -587,8 +726,11 @@ export class GameScene extends Phaser.Scene {
 
   // ---------------- main loop ----------------
 
-  update(time: number): void {
+  update(time: number, delta: number): void {
     if (this.state === 'paused' || this.state === 'over') return;
+
+    // refill the juice particle budget (~240 particles/sec)
+    this.particleBudget = Math.min(240, this.particleBudget + delta * 0.24);
 
     // aim fruit follows pointer
     if (!this.aimImg && time >= this.cooldownUntil) this.showAimFruit();
@@ -615,5 +757,23 @@ export class GameScene extends Phaser.Scene {
 
     this.processMerges();
     this.checkDanger(time);
+    this.updateShadows();
+  }
+
+  /** Sync each fruit's blob shadow: glued under the fruit, shrinking and
+   *  fading as the fruit rises — sells the 3D depth. Allocation-free. */
+  private updateShadows(): void {
+    for (const f of this.fruits) {
+      if (!f.active) continue;
+      const sh = f.getData('shadow') as Phaser.GameObjects.Image | undefined;
+      if (!sh) continue;
+      const r = radiusForTier(f.getData('tier') as number);
+      const hFrac = Phaser.Math.Clamp((GAME.floorTop - f.y) / GAME.floorTop, 0, 1);
+      sh.x = f.x;
+      sh.y = f.y + r * (0.92 - 0.3 * hFrac);
+      const s = 1 - 0.35 * hFrac;
+      sh.setScale((f.getData('shSX') as number) * s, (f.getData('shSY') as number) * s);
+      sh.setAlpha(0.3 * (1 - 0.45 * hFrac));
+    }
   }
 }
