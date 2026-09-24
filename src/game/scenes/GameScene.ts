@@ -72,6 +72,7 @@ export class GameScene extends Phaser.Scene {
     this.buildWalls();
     this.buildDangerLine();
     this.buildHud();
+    this.drawEvoBar();
     this.buildEmitters();
 
     // collisions → queue, processed once per frame in update()
@@ -171,6 +172,31 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(0x5e3a18, 0.35); // soft contact shadow under the playfield
     g.fillRect(L, F - 6, R - L, 6);
     void L;
+  }
+
+  /**
+   * Bottom evolution hint bar: the 10 fruits in merge order, small → large.
+   * Lives on the floor-frame strip (below floorTop) so it never covers fruit.
+   */
+  private drawEvoBar(): void {
+    const top = 696;
+    const h = 38;
+    const cy = top + h / 2;
+    const g = this.add.graphics().setDepth(4);
+    g.fillStyle(0x1c1008, 0.62);
+    g.fillRoundedRect(6, top, GAME.width - 12, h, 10);
+    g.lineStyle(1.5, 0xffffff, 0.12);
+    g.strokeRoundedRect(6, top, GAME.width - 12, h, 10);
+    // non-linear icon scale: monotonic with real size, but small fruits stay legible
+    const minD = 16;
+    const maxD = 36;
+    for (let tier = 1; tier <= MAX_TIER; tier++) {
+      const f = (tier - 1) / (MAX_TIER - 1);
+      const d = minD + (maxD - minD) * f;
+      const x = 32 + (GAME.width - 64) * f;
+      const img = this.add.image(x, cy, FRUITS[tier - 1].tex).setDepth(5);
+      img.setDisplaySize(d, d);
+    }
   }
 
   private buildDangerLine(): void {
