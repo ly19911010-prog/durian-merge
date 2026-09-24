@@ -52,7 +52,7 @@ export const GAME = {
   spawnTiers: [1, 2, 3, 4] as number[],
   spawnWeights: [42, 32, 20, 6] as number[],
 
-  baseRadius: 32,
+  baseRadius: 40,
 
   /**
    * Body radius = visual radius × this fruit's bodyFactor × this overlap.
