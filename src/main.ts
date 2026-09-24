@@ -90,11 +90,12 @@ function enableRetinaRendering(game: Phaser.Game): void {
 
   game.events.once(Phaser.Core.Events.READY, () => {
     apply();
-    // scenes that start later (Start, Game) get their camera viewport on create
-    for (const s of game.scene.getScenes(false)) {
-      if (!s.sys.isActive()) {
-        s.events.once(Phaser.Scenes.Events.CREATE, apply);
-      }
+    // Re-apply on EVERY scene create, not just the first: scene.start() /
+    // scene.restart() recreate the cameras with default 420x740 viewports,
+    // which would clip rendering into the corner of the 3x buffer
+    // (caught by headless test: game-over -> home -> play again).
+    for (const s of game.scene.scenes) {
+      s.events.on(Phaser.Scenes.Events.CREATE, apply);
     }
   });
   game.scale.on(Phaser.Scale.Events.RESIZE, () => {
