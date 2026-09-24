@@ -26,10 +26,13 @@ export function createFruit(
   // the body to r*(2r/512) ≈ 1px, making fruits visually overlap without ever
   // colliding — the "same fruits touch but never merge" bug.)
   //
-  // The body is then made to match the VISUAL radius 1:1 (bodyFactor 1.0
-  // for every tier since v2.4, then × bodyTouchOverlap 0.99 as solver margin):
-  // touching fruits kiss edge-to-edge with no visual overlap, while
-  // collision/merge still trigger on the hair-smaller body.
+  // The body is then made to match the DRAWN fruit 1:1 — bodyFactor is the
+  // per-tier measured tight-art factor (v3.1, see gameConfig), since the v3.0
+  // jelly art only fills 62–88% of its 512px canvas. A factor of 1.0 left a
+  // visible gap between touching fruits; matching the art makes neighbours
+  // kiss edge-to-edge (× bodyTouchOverlap 0.99 as solver margin): touching
+  // fruits kiss with no visual gap, while collision/merge still trigger on
+  // the hair-smaller body.
   const img = scene.matter.add.image(x, y, texForTier(tier), undefined, {
     shape: { type: 'circle', radius: 256 * bodyFactorForTier(tier) * GAME.bodyTouchOverlap },
     restitution: p.restitution,
