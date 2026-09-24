@@ -7,6 +7,11 @@ export function drawBackground(scene: Phaser.Scene): void {
   // warm gradient sky
   g.fillGradientStyle(0xfff7de, 0xfff7de, 0xffd98f, 0xffd98f, 1, 1, 1, 1);
   g.fillRect(0, 0, GAME.width, GAME.height);
+  // gentle sun glow behind the playfield for a softer, warmer center
+  g.fillStyle(0xfffbe8, 0.32);
+  g.fillCircle(GAME.width / 2, 300, 150);
+  g.fillStyle(0xfffbe8, 0.22);
+  g.fillCircle(GAME.width / 2, 300, 215);
   // soft decorative blobs
   const blobs: Array<[number, number, number, number]> = [
     [60, 620, 90, 0xffedb8],
