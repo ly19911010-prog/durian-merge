@@ -17,10 +17,10 @@ export interface FruitTierDef {
    * gap between adjacent tiers is constant and clearly visible.
    */
   /**
-   * Per-fruit physics body factor: flesh inscribed-circle radius ÷ texture
-   * size, measured from the v13 art (fruits are centered, transparent padding
-   * removed). Because each fruit's flesh fills the canvas differently
-   * (0.61–0.91), a single global factor can never fit all fruits gap-free.
+   * Per-fruit physics body factor. v2.4: 1.0 for every tier — the physics
+   * circle now matches the visual circle 1:1, so adjacent fruits touch
+   * edge-to-edge with no visual overlap. (Older builds used per-fruit
+   * measured factors 0.48–0.90, which made fruits sink into each other.)
    */
   bodyFactor: number;
   /** score awarded when THIS tier is created by a merge */
@@ -38,12 +38,12 @@ export const GAME = {
   innerRight: 406,
   floorTop: 712,
 
-  /** fruit hangs / drops from here */
-  aimY: 88,
+  /** fruit hangs / drops from here (below the HUD strip; big fruits need room) */
+  aimY: 130,
   /** pointer must release below this y to count as a drop (keeps HUD taps safe) */
-  dropMinY: 112,
+  dropMinY: 100,
 
-  dangerLineY: 130,
+  dangerLineY: 225,
   /** fruit must stay continuously above the line this long to end the game */
   dangerHoldMs: 2000,
   /** freshly dropped fruit gets a grace period before danger timing starts */
@@ -58,16 +58,20 @@ export const GAME = {
   /**
    * Fruit display sizes grow geometrically:
    *   diameter(i) = geoBaseDiameter × geoRatio^(i-1)
-   * tier1 (龙眼) 34px → tier10 (榴莲) 148px; geoRatio ≈ 1.1775, so every
-   * adjacent tier is ~18% bigger — the level gap is obvious at a glance.
+   * tier1 (龙眼) 100px → tier10 (榴莲) ≈ 256px; geoRatio = 1.11, so every
+   * adjacent tier is ~11% bigger — clearly visible steps, and the longan is
+   * ~3x its old 34px size. Durian at ~256px fills ~65% of the 392px-wide
+   * container (close to the Suika watermelon ratio); bigger would burst the box.
    */
-  geoBaseDiameter: 34,
-  geoRatio: (148 / 34) ** (1 / 9),
+  geoBaseDiameter: 100,
+  geoRatio: 1.11,
 
   /**
    * Body radius = visual radius × this fruit's bodyFactor × this overlap.
-   * 0.99 makes the flesh visually kiss on contact (fully gap-free) while
-   * collision/merge still trigger on the slightly smaller body.
+   * bodyFactor is 1.0 for every tier (v2.4): physics radius == visual radius,
+   * so touching fruits visually kiss edge-to-edge instead of sinking into
+   * each other. The 0.99 overlap keeps a hair of solver margin so resting
+   * contacts never jitter — visually still gap-free.
    */
   bodyTouchOverlap: 0.99,
 
@@ -92,28 +96,27 @@ export const GAME = {
 } as const;
 
 export const FRUITS: FruitTierDef[] = [
-  { tier: 1,  tex: 'fruit_01', nameZh: '龙眼',   nameEn: 'Longan',      bodyFactor: 0.668, scoreOnCreate: 10,   color: 0xf5e6c8 },
-  { tier: 2,  tex: 'fruit_02', nameZh: '红毛丹', nameEn: 'Rambutan',    bodyFactor: 0.8965, scoreOnCreate: 20,   color: 0xff5a5a },
-  { tier: 3,  tex: 'fruit_03', nameZh: '青柠',   nameEn: 'Lime',        bodyFactor: 0.7656, scoreOnCreate: 40,   color: 0x9be15d },
-  { tier: 4,  tex: 'fruit_04', nameZh: '山竹',   nameEn: 'Mangosteen',  bodyFactor: 0.8008,  scoreOnCreate: 80,   color: 0x9b59b6 },
-  { tier: 5,  tex: 'fruit_05', nameZh: '椰子',   nameEn: 'Coconut',     bodyFactor: 0.8672, scoreOnCreate: 150,  color: 0xd9c39a },
-  { tier: 6,  tex: 'fruit_06', nameZh: '柚子',   nameEn: 'Pomelo',      bodyFactor: 0.8164, scoreOnCreate: 250,  color: 0xffe08a },
-  { tier: 7,  tex: 'fruit_07', nameZh: '芒果',   nameEn: 'Mango',       bodyFactor: 0.668, scoreOnCreate: 400,  color: 0xffb340 },
-  { tier: 8,  tex: 'fruit_08', nameZh: '火龙果', nameEn: 'Dragon Fruit',bodyFactor: 0.6523, scoreOnCreate: 650,  color: 0xff4d88 },
-  { tier: 9,  tex: 'fruit_09', nameZh: '菠萝',   nameEn: 'Pineapple',   bodyFactor: 0.5371, scoreOnCreate: 1000, color: 0xffd23f },
-  { tier: 10, tex: 'fruit_10', nameZh: '榴莲',   nameEn: 'Durian',      bodyFactor: 0.7734, scoreOnCreate: 1600, color: 0x8bc34a },
+  { tier: 1,  tex: 'fruit_01', nameZh: '龙眼',   nameEn: 'Longan',      bodyFactor: 1.0, scoreOnCreate: 10,   color: 0xf5e6c8 },
+  { tier: 2,  tex: 'fruit_02', nameZh: '红毛丹', nameEn: 'Rambutan',    bodyFactor: 1.0, scoreOnCreate: 20,   color: 0xff5a5a },
+  { tier: 3,  tex: 'fruit_03', nameZh: '青柠',   nameEn: 'Lime',        bodyFactor: 1.0, scoreOnCreate: 40,   color: 0x9be15d },
+  { tier: 4,  tex: 'fruit_04', nameZh: '山竹',   nameEn: 'Mangosteen',  bodyFactor: 1.0, scoreOnCreate: 80,   color: 0x9b59b6 },
+  { tier: 5,  tex: 'fruit_05', nameZh: '椰子',   nameEn: 'Coconut',     bodyFactor: 1.0, scoreOnCreate: 150,  color: 0xd9c39a },
+  { tier: 6,  tex: 'fruit_06', nameZh: '柚子',   nameEn: 'Pomelo',      bodyFactor: 1.0, scoreOnCreate: 250,  color: 0xffe08a },
+  { tier: 7,  tex: 'fruit_07', nameZh: '芒果',   nameEn: 'Mango',       bodyFactor: 1.0, scoreOnCreate: 400,  color: 0xffb340 },
+  { tier: 8,  tex: 'fruit_08', nameZh: '火龙果', nameEn: 'Dragon Fruit',bodyFactor: 1.0, scoreOnCreate: 650,  color: 0xff4d88 },
+  { tier: 9,  tex: 'fruit_09', nameZh: '菠萝',   nameEn: 'Pineapple',   bodyFactor: 1.0, scoreOnCreate: 1000, color: 0xffd23f },
+  { tier: 10, tex: 'fruit_10', nameZh: '榴莲',   nameEn: 'Durian',      bodyFactor: 1.0, scoreOnCreate: 1600, color: 0x8bc34a },
 ];
 
 export const MAX_TIER = FRUITS.length;
 
-/** Display (physics) radius in px for a tier. */
 /** Display (visual) radius in px for a tier: geometric growth, d(i) = geoBaseDiameter × geoRatio^(i-1). */
 export function radiusForTier(tier: number): number {
   if (!FRUITS[tier - 1]) throw new Error(`invalid tier ${tier}`);
   return (GAME.geoBaseDiameter / 2) * Math.pow(GAME.geoRatio, tier - 1);
 }
 
-/** Physics body factor for a tier (flesh inscribed circle ÷ texture size). */
+/** Physics body factor for a tier (v2.4: 1.0 for all tiers — body == visual). */
 export function bodyFactorForTier(tier: number): number {
   const def = FRUITS[tier - 1];
   if (!def) throw new Error(`invalid tier ${tier}`);
