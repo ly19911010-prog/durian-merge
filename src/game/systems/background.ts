@@ -18,4 +18,13 @@ export function drawBackground(scene: Phaser.Scene): void {
     g.fillStyle(c, 0.5);
     g.fillCircle(x, y, r);
   }
+  // soft ground shadow under the play area for depth
+  g.fillGradientStyle(0xe8b96a, 0xe8b96a, 0xd9a44f, 0xd9a44f, 0.35, 0.35, 0.5, 0.5);
+  g.fillEllipse(GAME.width / 2, GAME.floorTop + 26, 340, 44);
+  // subtle vignette to lift the center
+  const vg = scene.add.graphics().setDepth(-9);
+  vg.fillGradientStyle(0x8a5a20, 0x8a5a20, 0x8a5a20, 0x8a5a20, 0, 0, 0.12, 0.12);
+  vg.fillRect(0, 0, GAME.width, 90);
+  vg.fillGradientStyle(0x8a5a20, 0x8a5a20, 0x8a5a20, 0x8a5a20, 0.12, 0.12, 0, 0);
+  vg.fillRect(0, GAME.height - 120, GAME.width, 120);
 }
