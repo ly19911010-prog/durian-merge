@@ -36,33 +36,32 @@ function ok(cond, name) {
 }
 const approx = (a, b) => Math.abs(a - b) < 1e-9;
 
-// --- radius: geometric growth, d(i) = 34 × 1.1775^(i-1) ---
-ok(approx(logic.radiusForTier(1), 17), 'radius tier1 = 17 (diameter 34)');
+// --- radius: geometric growth, d(i) = 100 × 1.11^(i-1) ---
+ok(approx(logic.radiusForTier(1), 50), 'radius tier1 = 50 (diameter 100)');
 let mono = true;
 for (let t = 2; t <= 10; t++) if (!(logic.radiusForTier(t) > logic.radiusForTier(t - 1))) mono = false;
 ok(mono, 'radius strictly increasing 1..10');
 const ratios = [];
 for (let t = 2; t <= 10; t++) ratios.push(logic.radiusForTier(t) / logic.radiusForTier(t - 1));
 ok(ratios.every((x) => approx(x, cfg.GAME.geoRatio)), 'constant geometric ratio across tiers 1..10');
-ok(Math.abs(logic.radiusForTier(10) - 74) < 1e-6, 'radius tier10 ≈ 74 (diameter ≈ 148)');
-ok(logic.radiusForTier(10) * 2 <= 150, 'tier10 diameter <= 150');
-ok(logic.radiusForTier(1) * 2 >= 30, 'tier1 diameter >= 30');
-// per-fruit body factors measured from the v2.0 art (flesh ÷ texture), so every
-// fruit's flesh visually kisses on contact with zero gap
-const expectedFactors = { 1: 0.8574, 2: 0.875, 3: 0.8477, 4: 0.7344, 5: 0.8145, 6: 0.8945, 7: 0.668, 8: 0.6758, 9: 0.4824, 10: 0.6797 };
-ok(Object.entries(expectedFactors).every(([t, f]) => approx(cfg.bodyFactorForTier(Number(t)), f)), 'per-tier bodyFactor table 1..10');
+ok(approx(cfg.GAME.geoRatio, 1.11), 'geoRatio = 1.11 (~11% step per tier)');
+ok(Math.abs(logic.radiusForTier(10) - 127.9) < 0.05, 'radius tier10 ≈ 127.9 (diameter ≈ 256)');
+ok(logic.radiusForTier(10) * 2 <= 260, 'tier10 diameter <= 260');
+ok(logic.radiusForTier(1) * 2 >= 90, 'tier1 diameter >= 90');
+// v2.4: bodyFactor = 1.0 for every tier — physics radius == visual radius,
+// so touching fruits kiss edge-to-edge with no visual overlap
+const expectedFactors = { 1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0, 5: 1.0, 6: 1.0, 7: 1.0, 8: 1.0, 9: 1.0, 10: 1.0 };
+ok(Object.entries(expectedFactors).every(([t, f]) => approx(cfg.bodyFactorForTier(Number(t)), f)), 'per-tier bodyFactor = 1.0 for all tiers 1..10');
 ok(approx(cfg.GAME.bodyTouchOverlap, 0.99), 'touch overlap factor = 0.99');
-// body radius (256*factor*0.99) lands between flesh and texture size for all tiers
-// (lower bound 0.45: tier 9 pineapple's inscribed circle is small because the
-// tall crown counts toward texture height — its body width is what collides)
+// body radius = r × 1.0 × 0.99: a hair under visual, gap-free to the eye
 ok(Object.entries(expectedFactors).every(([t, f]) => {
   const r = logic.radiusForTier(Number(t));
   const bodyR = r * f * cfg.GAME.bodyTouchOverlap;
-  return bodyR < r && bodyR > r * 0.45;
-}), 'body radius slightly smaller than visual radius, all tiers');
-// biggest spawnable fruit (tier4) fits the 392px-wide container with margin
+  return bodyR < r && bodyR > r * 0.95;
+}), 'body radius == 0.99 × visual radius, all tiers');
+// biggest spawnable fruit (tier4, diameter ≈ 137) fits the 392px-wide container with margin
 ok(logic.radiusForTier(4) * 2 < cfg.GAME.innerRight - cfg.GAME.innerLeft, 'tier4 diameter < container width');
-// biggest fruit (tier10 durian, diameter ≈ 148) still fits and stays playable in the container
+// biggest fruit (tier10 durian, diameter ≈ 256) still fits the container (~65% of width)
 ok(logic.radiusForTier(10) * 2 < cfg.GAME.innerRight - cfg.GAME.innerLeft, 'tier10 diameter < container width');
 // physics "fruit feel": gentle bounce, medium friction, uniform density
 ok(approx(cfg.GAME.physics.restitution, 0.25), 'restitution = 0.25');
