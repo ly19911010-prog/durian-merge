@@ -1,11 +1,11 @@
-/** Start screen: logo placeholder, Play, Best Score, fruit chain preview. */
+/** Start screen: hero durian, juicy title, fruit arrangement, play button. */
 import Phaser from 'phaser';
 import { GAME, FRUITS } from '../../config/gameConfig';
 import { STR } from '../../config/strings';
 import { loadBest } from '../../utils/storage';
 import { sfx } from '../../audio/sfx';
 import { drawBackground } from '../systems/background';
-import { makeButton } from '../systems/ui';
+import { makeButton, FONT_FAMILY } from '../systems/ui';
 
 export class StartScene extends Phaser.Scene {
   constructor() {
@@ -16,48 +16,60 @@ export class StartScene extends Phaser.Scene {
     drawBackground(this);
     const cx = GAME.width / 2;
 
-    // logo placeholder: big durian with gentle bob
-    const logo = this.add.image(cx, 210, 'fruit_10').setDisplaySize(150, 150);
+    // hero durian with gentle bob
+    const logo = this.add.image(cx, 196, 'fruit_10').setDisplaySize(150, 150);
     this.tweens.add({
-      targets: logo,
-      y: 222,
-      duration: 1400,
-      ease: 'Sine.easeInOut',
-      yoyo: true,
-      repeat: -1,
+      targets: logo, y: 208, duration: 1400,
+      ease: 'Sine.easeInOut', yoyo: true, repeat: -1,
     });
+    // small fruits posed around the hero
+    const side: Array<[string, number, number, number]> = [
+      ['fruit_08', cx - 118, 150, 64],
+      ['fruit_09', cx + 122, 158, 70],
+      ['fruit_03', cx - 96, 262, 52],
+      ['fruit_07', cx + 100, 268, 56],
+    ];
+    for (const [tex, x, y, s] of side) {
+      const img = this.add.image(x, y, tex).setDisplaySize(s, s);
+      this.tweens.add({
+        targets: img, y: y + 8, duration: 1100 + s * 6,
+        ease: 'Sine.easeInOut', yoyo: true, repeat: -1,
+      });
+    }
 
     this.add
       .text(cx, 330, STR.title, {
-        fontSize: '54px',
-        color: '#4a7c2f',
-        fontStyle: 'bold',
-        stroke: '#ffffff',
-        strokeThickness: 6,
+        fontFamily: FONT_FAMILY,
+        fontSize: '58px',
+        color: '#fff8ea',
+        stroke: '#7a3c10',
+        strokeThickness: 10,
+        shadow: { offsetX: 0, offsetY: 4, color: '#4a2408', blur: 0, fill: true },
       })
       .setOrigin(0.5);
     this.add
-      .text(cx, 372, STR.subtitle, { fontSize: '17px', color: '#7a5a2e' })
+      .text(cx, 376, STR.subtitle, {
+        fontFamily: FONT_FAMILY, fontSize: '18px', color: '#fff3d9',
+        stroke: '#7a4a20', strokeThickness: 4,
+      })
       .setOrigin(0.5);
     this.add
       .text(cx, 428, STR.howTo, {
-        fontSize: '16px',
-        color: '#8a6a3a',
-        align: 'center',
-        lineSpacing: 6,
+        fontFamily: FONT_FAMILY, fontSize: '17px', color: '#fff3d9',
+        stroke: '#7a4a20', strokeThickness: 4,
+        align: 'center', lineSpacing: 6,
       })
       .setOrigin(0.5, 0);
 
-    makeButton(this, cx, 540, 230, 64, STR.play, () => {
+    makeButton(this, cx, 544, 240, 66, STR.play, () => {
       this.scene.start('Game');
     });
 
     const best = loadBest();
     this.add
-      .text(cx, 600, `${STR.bestScore}：${best}`, {
-        fontSize: '22px',
-        color: '#5b3a1e',
-        fontStyle: 'bold',
+      .text(cx, 604, `${STR.bestScore}：${best}`, {
+        fontFamily: FONT_FAMILY, fontSize: '23px', color: '#fff8ea',
+        stroke: '#7a4a20', strokeThickness: 5,
       })
       .setOrigin(0.5);
 
@@ -72,7 +84,10 @@ export class StartScene extends Phaser.Scene {
       img.setData('tier', f.tier);
     });
     this.add
-      .text(cx, 700, '龙眼 → 榴莲：合成进化链', { fontSize: '14px', color: '#8a6a3a' })
+      .text(cx, 700, '龙眼 → 榴莲：合成进化链', {
+        fontFamily: FONT_FAMILY, fontSize: '15px', color: '#fff3d9',
+        stroke: '#7a4a20', strokeThickness: 3,
+      })
       .setOrigin(0.5);
 
     this.input.once('pointerdown', () => sfx.unlock());
