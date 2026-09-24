@@ -42,8 +42,17 @@ let mono = true;
 for (let t = 2; t <= 10; t++) if (!(logic.radiusForTier(t) > logic.radiusForTier(t - 1))) mono = false;
 ok(mono, 'radius strictly increasing 1..10');
 ok(approx(logic.radiusForTier(10), 32 * 1.48), 'radius tier10 = 47.36');
-// body slightly smaller than visual so touching fruits have no visible gap
-ok(approx(cfg.GAME.bodyRadiusFactor, 0.92), 'body radius factor = 0.92');
+// per-fruit body factors measured from the v13 art (flesh ÷ texture), so every
+// fruit's flesh visually kisses on contact with zero gap
+const expectedFactors = { 1: 0.8379, 2: 0.9141, 3: 0.8613, 4: 0.793, 5: 0.9102, 6: 0.8516, 7: 0.8555, 8: 0.6816, 9: 0.6113, 10: 0.8242 };
+ok(Object.entries(expectedFactors).every(([t, f]) => approx(cfg.bodyFactorForTier(Number(t)), f)), 'per-tier bodyFactor table 1..10');
+ok(approx(cfg.GAME.bodyTouchOverlap, 0.99), 'touch overlap factor = 0.99');
+// body radius (256*factor*0.99) lands between flesh and texture size for all tiers
+ok(Object.entries(expectedFactors).every(([t, f]) => {
+  const r = logic.radiusForTier(Number(t));
+  const bodyR = r * f * cfg.GAME.bodyTouchOverlap;
+  return bodyR < r && bodyR > r * 0.5;
+}), 'body radius slightly smaller than visual radius, all tiers');
 // biggest spawnable fruit (tier4) fits the 392px-wide container with margin
 ok(logic.radiusForTier(4) * 2 < cfg.GAME.innerRight - cfg.GAME.innerLeft, 'tier4 diameter < container width');
 // physics "fruit feel": gentle bounce, medium friction, uniform density
