@@ -1,0 +1,95 @@
+/**
+ * Durian Merge — centralized tuning config.
+ * ALL gameplay numbers live here. Nothing gameplay-related should be
+ * hardcoded in scenes/systems.
+ */
+
+export interface FruitTierDef {
+  /** 1-indexed tier */
+  tier: number;
+  /** Phaser texture key */
+  tex: string;
+  nameZh: string;
+  nameEn: string;
+  /** display-radius multiplier on top of baseRadius */
+  radiusScale: number;
+  /** score awarded when THIS tier is created by a merge */
+  scoreOnCreate: number;
+  /** particle tint color for merges */
+  color: number;
+}
+
+export const GAME = {
+  width: 420,
+  height: 740,
+
+  /** container inner bounds (walls) */
+  innerLeft: 14,
+  innerRight: 406,
+  floorTop: 712,
+
+  /** fruit hangs / drops from here */
+  aimY: 88,
+  /** pointer must release below this y to count as a drop (keeps HUD taps safe) */
+  dropMinY: 112,
+
+  dangerLineY: 130,
+  /** fruit must stay continuously above the line this long to end the game */
+  dangerHoldMs: 2000,
+  /** freshly dropped fruit gets a grace period before danger timing starts */
+  dangerGraceMs: 800,
+
+  dropCooldownMs: 600,
+
+  /** spawn pool: tiers + weights (tier >= 5 never spawns) */
+  spawnTiers: [1, 2, 3, 4] as number[],
+  spawnWeights: [42, 32, 20, 6] as number[],
+
+  baseRadius: 24,
+
+  physics: {
+    gravityY: 1,
+    restitution: 0.15,
+    friction: 0.6,
+    frictionStatic: 1.2,
+    frictionAir: 0.012,
+  },
+
+  /** perf guard */
+  maxLiveFruits: 150,
+
+  /** Durian Burst: two tier-10 colliding */
+  burst: {
+    bonusScore: 3000,
+    radius: 170,
+    /** removes all live fruits with tier <= this within radius */
+    maxTierRemoved: 4,
+  },
+} as const;
+
+export const FRUITS: FruitTierDef[] = [
+  { tier: 1,  tex: 'fruit_01', nameZh: '龙眼',   nameEn: 'Longan',      radiusScale: 0.55, scoreOnCreate: 10,   color: 0xf5e6c8 },
+  { tier: 2,  tex: 'fruit_02', nameZh: '红毛丹', nameEn: 'Rambutan',    radiusScale: 0.65, scoreOnCreate: 20,   color: 0xff5a5a },
+  { tier: 3,  tex: 'fruit_03', nameZh: '青柠',   nameEn: 'Lime',        radiusScale: 0.75, scoreOnCreate: 40,   color: 0x9be15d },
+  { tier: 4,  tex: 'fruit_04', nameZh: '山竹',   nameEn: 'Mangosteen',  radiusScale: 0.82, scoreOnCreate: 80,   color: 0x9b59b6 },
+  { tier: 5,  tex: 'fruit_05', nameZh: '椰子',   nameEn: 'Coconut',     radiusScale: 0.92, scoreOnCreate: 150,  color: 0xd9c39a },
+  { tier: 6,  tex: 'fruit_06', nameZh: '柚子',   nameEn: 'Pomelo',      radiusScale: 1.00, scoreOnCreate: 250,  color: 0xffe08a },
+  { tier: 7,  tex: 'fruit_07', nameZh: '芒果',   nameEn: 'Mango',       radiusScale: 1.12, scoreOnCreate: 400,  color: 0xffb340 },
+  { tier: 8,  tex: 'fruit_08', nameZh: '火龙果', nameEn: 'Dragon Fruit',radiusScale: 1.22, scoreOnCreate: 650,  color: 0xff4d88 },
+  { tier: 9,  tex: 'fruit_09', nameZh: '菠萝',   nameEn: 'Pineapple',   radiusScale: 1.34, scoreOnCreate: 1000, color: 0xffd23f },
+  { tier: 10, tex: 'fruit_10', nameZh: '榴莲',   nameEn: 'Durian',      radiusScale: 1.48, scoreOnCreate: 1600, color: 0x8bc34a },
+];
+
+export const MAX_TIER = FRUITS.length;
+
+/** Display (physics) radius in px for a tier. */
+export function radiusForTier(tier: number): number {
+  const def = FRUITS[tier - 1];
+  if (!def) throw new Error(`invalid tier ${tier}`);
+  return GAME.baseRadius * def.radiusScale;
+}
+
+/** Texture key for a tier. */
+export function texForTier(tier: number): string {
+  return FRUITS[tier - 1].tex;
+}
