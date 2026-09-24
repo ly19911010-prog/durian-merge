@@ -24,10 +24,7 @@ export function drawBackground(scene: Phaser.Scene): void {
   });
   dust.setDepth(-9);
 
-  // soft vignette to focus the play area (kept subtle so HUD stays readable)
-  const vg = scene.add.graphics().setDepth(50);
-  for (let i = 0; i < 6; i++) {
-    vg.lineStyle(26, 0x2a1430, 0.04 + (i / 6) * 0.1);
-    vg.strokeRect(i * 13, i * 13, GAME.width - i * 26, GAME.height - i * 26);
-  }
+  // NOTE (v2.4): the old 6-stroke edge vignette is gone — its stacked
+  // dark-purple bands read as a grey veil over the play area on phones.
+  // The dusk photo already frames the scene with palm silhouettes.
 }
