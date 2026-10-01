@@ -19,6 +19,11 @@ function createGame(): void {
     antialias: true,
     roundPixels: false, // sub-pixel motion reads smoother on phones
     powerPreference: 'high-performance',
+    // v6.2: 512px fruit art is displayed at 52-169px. Phaser 3.60+ generates
+    // NO mipmaps by default, so the GPU minifies with plain bilinear sampling
+    // and fine detail turns to mush. LINEAR_MIPMAP_LINEAR gives trilinear
+    // downscaling (our textures are 512x512, power-of-two, so mipmaps apply).
+    mipmapFilter: 'LINEAR_MIPMAP_LINEAR',
   },
   fps: {
     target: 60,
