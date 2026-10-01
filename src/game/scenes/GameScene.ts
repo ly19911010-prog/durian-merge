@@ -27,6 +27,7 @@ export class GameScene extends Phaser.Scene {
   private state: State = 'aim';
 
   private score = 0;
+  private scoreProxy = { v: 0 };
   private best = 0;
   private maxTierReached = 1;
   private currentTier = 1;
@@ -40,12 +41,19 @@ export class GameScene extends Phaser.Scene {
   private bestText!: Phaser.GameObjects.Text;
   private soundBtn!: Phaser.GameObjects.Text;
   private dangerGfx!: Phaser.GameObjects.Graphics;
+  private dangerT = 0;
   private lastDangerBucket = -1;
 
   private cooldownUntil = 0;
   private mergeEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private juiceEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private dustEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private confettiEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  /** tiers first synthesized this session — drives the unlock toast */
+  private unlockedTiers = new Set<number>();
+  private toast: Phaser.GameObjects.Container | null = null;
+  private dangerEdgeImg!: Phaser.GameObjects.Image;
+  private zoomPulseAt = 0;
   /** rolling particle budget: juice bursts are capped so effects stay grand
    *  but never tank the frame rate on real phones (refills 240/sec) */
   private particleBudget = 240;
@@ -67,13 +75,16 @@ export class GameScene extends Phaser.Scene {
     this.best = loadBest();
     this.aimX = GAME.width / 2;
     this.cooldownUntil = 0;
+    this.unlockedTiers.clear();
+    this.zoomPulseAt = 0;
+    this.toast = null;
 
     drawBackground(this);
     this.buildWalls();
     this.buildDangerLine();
     this.buildHud();
-    this.drawEvoBar();
     this.buildEmitters();
+    this.buildAmbience();
 
     // collisions → queue, processed once per frame in update()
     this.matter.world.on('collisionstart', (event: { pairs: Array<{ bodyA: { gameObject?: unknown }; bodyB: { gameObject?: unknown } }> }) => {
@@ -174,31 +185,6 @@ export class GameScene extends Phaser.Scene {
     void L;
   }
 
-  /**
-   * Bottom evolution hint bar: the 10 fruits in merge order, small → large.
-   * Lives on the floor-frame strip (below floorTop) so it never covers fruit.
-   */
-  private drawEvoBar(): void {
-    const top = 696;
-    const h = 38;
-    const cy = top + h / 2;
-    const g = this.add.graphics().setDepth(4);
-    g.fillStyle(0x1c1008, 0.62);
-    g.fillRoundedRect(6, top, GAME.width - 12, h, 10);
-    g.lineStyle(1.5, 0xffffff, 0.12);
-    g.strokeRoundedRect(6, top, GAME.width - 12, h, 10);
-    // non-linear icon scale: monotonic with real size, but small fruits stay legible
-    const minD = 16;
-    const maxD = 36;
-    for (let tier = 1; tier <= MAX_TIER; tier++) {
-      const f = (tier - 1) / (MAX_TIER - 1);
-      const d = minD + (maxD - minD) * f;
-      const x = 32 + (GAME.width - 64) * f;
-      const img = this.add.image(x, cy, FRUITS[tier - 1].tex).setDepth(5);
-      img.setDisplaySize(d, d);
-    }
-  }
-
   private buildDangerLine(): void {
     this.dangerGfx = this.add.graphics().setDepth(5);
     this.redrawDangerLine(0.45);
@@ -211,42 +197,70 @@ export class GameScene extends Phaser.Scene {
   }
 
   private redrawDangerLine(alpha: number): void {
-    // glowing ribbon: soft outer glow band + bright core line
+    // slim glowing ribbon: soft halo band + 2px bright core + hairline shine
     const g = this.dangerGfx;
     g.clear();
     const y = GAME.dangerLineY;
     const x0 = GAME.innerLeft + 4;
     const x1 = GAME.innerRight - 4;
-    g.fillStyle(0xff5a36, 0.35 * alpha);
-    g.fillRoundedRect(x0, y - 5, x1 - x0, 10, 5);
-    g.lineStyle(3, 0xff3b1f, Math.min(1, alpha + 0.25));
+    g.fillStyle(0xff5a36, 0.22 * alpha);
+    g.fillRoundedRect(x0, y - 4, x1 - x0, 8, 4);
+    g.lineStyle(2, 0xff6a3d, Math.min(1, alpha + 0.3));
     g.lineBetween(x0, y, x1, y);
-    g.lineStyle(1.5, 0xffd9a8, Math.min(1, alpha + 0.35));
-    g.lineBetween(x0, y - 1.5, x1, y - 1.5);
+    g.lineStyle(1, 0xffe2b8, Math.min(1, alpha + 0.4));
+    g.lineBetween(x0, y - 1, x1, y - 1);
     g.setAlpha(1);
   }
 
   private buildHud(): void {
-    makeText(this, 16, 8, STR.score, {
-      fontFamily: FONT_FAMILY, fontSize: '17px', color: '#7a4a20',
-    });
-    this.scoreText = makeText(this, 16, 24, '0', {
-        fontFamily: FONT_FAMILY, fontSize: '34px', color: '#fff8ea',
-        stroke: '#7a4a20', strokeThickness: 6,
-      });
+    // ---- frosted-glass score panel (depth 10/11: above fruits, below fx) ----
+    const panel = this.add.graphics().setDepth(10);
+    // soft drop shadow
+    panel.fillStyle(0x2a1200, 0.25);
+    panel.fillRoundedRect(13, 11, 148, 64, 16);
+    // glass body
+    panel.fillStyle(0xffffff, 0.15);
+    panel.fillRoundedRect(10, 8, 148, 64, 16);
+    // top sheen
+    panel.fillStyle(0xffffff, 0.10);
+    panel.fillRoundedRect(15, 12, 138, 20, 10);
+    // hairline border
+    panel.lineStyle(1.5, 0xffffff, 0.35);
+    panel.strokeRoundedRect(10, 8, 148, 64, 16);
 
-    this.bestText = makeText(this, 150, 32, `${STR.bestScore} ${this.best}`, {
-      fontFamily: FONT_FAMILY, fontSize: '17px', color: '#fff3d9',
-      stroke: '#7a4a20', strokeThickness: 4,
-    });
+    makeText(this, 26, 14, STR.score, {
+      fontFamily: FONT_FAMILY, fontSize: '14px', color: '#ffe9c4',
+    }).setDepth(11);
+    this.scoreText = makeText(this, 26, 30, '0', {
+        fontFamily: FONT_FAMILY, fontSize: '36px', color: '#fff8ea',
+        fontStyle: 'bold',
+        shadow: { offsetX: 0, offsetY: 2, color: '#5b2a00', blur: 8, fill: true },
+      }).setDepth(11);
 
-    makeText(this, 292, 8, STR.next, {
-      fontFamily: FONT_FAMILY, fontSize: '17px', color: '#7a4a20',
-    });
-    this.nextImg = this.add.image(322, 46, 'fruit_01').setDisplaySize(38, 38);
+    this.bestText = makeText(this, 26, 78, `${STR.bestScore} ${this.best}`, {
+      fontFamily: FONT_FAMILY, fontSize: '15px', color: '#fff3d9',
+      shadow: { offsetX: 0, offsetY: 1, color: '#5b2a00', blur: 4, fill: true },
+    }).setDepth(11);
 
-    makeIconButton(this, 386, 24, STR.pauseIcon, () => this.togglePause());
-    this.soundBtn = makeIconButton(this, 386, 58, sfx.isMuted() ? STR.soundOff : STR.soundOn, () => {
+    // ---- next-fruit glass badge ----
+    const bx = 318, by = 40, br = 27;
+    const badge = this.add.graphics().setDepth(10);
+    badge.fillStyle(0x2a1200, 0.25);
+    badge.fillCircle(bx, by + 2, br);
+    badge.fillStyle(0xffffff, 0.15);
+    badge.fillCircle(bx, by, br);
+    badge.lineStyle(1.5, 0xffffff, 0.35);
+    badge.strokeCircle(bx, by, br);
+    badge.lineStyle(2, 0xffd98a, 0.45);
+    badge.strokeCircle(bx, by, br - 4);
+    makeText(this, bx, by - br - 16, STR.next, {
+      fontFamily: FONT_FAMILY, fontSize: '14px', color: '#ffe9c4',
+      shadow: { offsetX: 0, offsetY: 1, color: '#5b2a00', blur: 4, fill: true },
+    }).setOrigin(0.5).setDepth(11);
+    this.nextImg = this.add.image(bx, by, 'fruit_01').setDisplaySize(34, 34).setDepth(11);
+
+    makeIconButton(this, 386, 26, STR.pauseIcon, () => this.togglePause());
+    this.soundBtn = makeIconButton(this, 386, 62, sfx.isMuted() ? STR.soundOff : STR.soundOn, () => {
       const m = sfx.toggleMuted();
       this.soundBtn.setText(m ? STR.soundOff : STR.soundOn);
     });
@@ -294,6 +308,31 @@ export class GameScene extends Phaser.Scene {
       emitting: false,
     });
     this.dustEmitter.setDepth(18);
+    // new-record confetti: gravity-driven colored burst, one-shot
+    this.confettiEmitter = this.add.particles(0, 0, 'dot', {
+      speed: { min: 200, max: 520 },
+      angle: { min: 0, max: 360 },
+      gravityY: 850,
+      lifespan: { min: 800, max: 1500 },
+      scale: { start: 0.3, end: 0.08 },
+      alpha: { start: 1, end: 0.4 },
+      quantity: 0,
+      emitting: false,
+    });
+    this.confettiEmitter.setDepth(110);
+  }
+
+  /** v3.3 ambience: whisper-subtle vignette, red danger edge, combo banner */
+  private buildAmbience(): void {
+    // vignette (depth 6: above the fruit layer, below HUD) — feathered dark
+    // corners only, seats the playfield in the frame
+    this.add.image(GAME.width / 2, GAME.height / 2, 'vignette').setDepth(6);
+    // red danger edge: alpha driven per-frame in update() while a fruit sits
+    // in the danger zone
+    this.dangerEdgeImg = this.add
+      .image(GAME.width / 2, GAME.height / 2, 'dangerEdge')
+      .setDepth(60)
+      .setAlpha(0);
   }
 
   /**
@@ -418,7 +457,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateNextPreview(): void {
-    this.nextImg.setTexture(FRUITS[this.nextTier - 1].tex).setDisplaySize(38, 38);
+    this.nextImg.setTexture(FRUITS[this.nextTier - 1].tex).setDisplaySize(34, 34);
   }
 
   private enforceCap(): void {
@@ -600,9 +639,34 @@ export class GameScene extends Phaser.Scene {
 
   private doMergeSpawn(newTier: number, x: number, y: number): void {
     const now = this.time.now;
+
     const fruit = createFruit(this, x, y, newTier, now);
     // "squeezed out" feel: a tiny upward hop on birth (popIn adds the scale pop)
     fruit.setVelocity(0, -1.8);
+    // merge displacement (v6.3, Suika-style): the new bigger fruit shoves
+    // overlapping neighbours outward so the pile visibly buckles — this is
+    // what enables Puyo-style chain reactions. Gentle by design: just enough
+    // to nudge, never enough to launch fruits out of the box.
+    {
+      const R = radiusForTier(newTier);
+      for (const f of this.fruits) {
+        if (f === fruit || f.getData('merging')) continue;
+        const body = f.body as MatterJS.BodyType | null;
+        if (!body) continue;
+        const dx = f.x - x;
+        const dy = f.y - y;
+        const d = Math.hypot(dx, dy);
+        if (d < 0.01) continue;
+        const fr = radiusForTier(f.getData('tier') as number);
+        const range = (R + fr) * 1.12;
+        if (d < range) {
+          const push = 1.6 * (1 - d / range) + 0.4;
+          const ux = dx / d;
+          const uy = dy / d;
+          f.setVelocity(body.velocity.x + ux * push, body.velocity.y + uy * push - 0.4);
+        }
+      }
+    }
     this.fruits.push(fruit);
     this.enforceCap();
     this.maxTierReached = Math.max(this.maxTierReached, newTier);
@@ -611,6 +675,39 @@ export class GameScene extends Phaser.Scene {
     const gained = mergeScoreForTier(newTier);
     this.addScore(gained);
     this.floatText(x, y - radiusForTier(newTier) - 6, `+${gained}`, '#e67e22', 22);
+
+    // first synthesis of a tier (3+) this session gets a celebration toast
+    if (newTier >= 3 && !this.unlockedTiers.has(newTier)) {
+      this.unlockedTiers.add(newTier);
+      this.showUnlockToast(newTier);
+    }
+
+    // merge glow: soft additive halo in the new fruit's color, blooms and
+    // fades — the "impact light" that sells the merge moment
+    const glow = this.add
+      .image(x, y, 'glow')
+      .setDepth(21)
+      .setTint(color)
+      .setAlpha(0.75)
+      .setScale(0.25)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    const glowTarget = (radiusForTier(newTier) * 3.6) / 256;
+    this.tweens.add({
+      targets: glow,
+      scaleX: glowTarget,
+      scaleY: glowTarget,
+      alpha: 0,
+      duration: 380,
+      ease: 'Cubic.easeOut',
+      onComplete: () => glow.destroy(),
+    });
+
+    // camera kick on medium+ merges (350ms guard: chains thump, not wobble)
+    if (newTier >= 5 && now - this.zoomPulseAt > 350) {
+      this.zoomPulseAt = now;
+      this.cameras.main.zoomTo(1.018, 110, 'Quad.easeOut');
+      this.time.delayedCall(120, () => this.cameras.main.zoomTo(1, 160, 'Quad.easeInOut'));
+    }
 
     // juice splash: droplet count scales with tier, hard-capped by the rolling
     // particle budget so the effect stays grand without dropping frames
@@ -644,6 +741,52 @@ export class GameScene extends Phaser.Scene {
     this.mergeEmitter.explode(16, x, y);
     popIn(this, fruit);
     sfx.merge(newTier);
+  }
+
+  /** "New fruit unlocked" toast under the HUD — slides down with a gold
+   *  sparkle, holds, slides away. One instance at a time; a fresh unlock
+   *  replaces the old toast instantly. */
+  private showUnlockToast(tier: number): void {
+    if (this.toast) {
+      this.tweens.killTweensOf(this.toast);
+      this.toast.destroy();
+      this.toast = null;
+    }
+    const cx = GAME.width / 2;
+    const g = this.add.graphics();
+    const w = 310;
+    const h = 48;
+    g.fillStyle(0x1c0e00, 0.8);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h, 24);
+    g.lineStyle(2, 0xffd23f, 0.85);
+    g.strokeRoundedRect(-w / 2, -h / 2, w, h, 24);
+    const t = makeText(this, 0, 0, `${STR.unlockNew}${FRUITS[tier - 1].nameZh}`, {
+        fontFamily: FONT_FAMILY,
+        fontSize: '21px',
+        color: '#ffe9c4',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+    const c = this.add.container(cx, 120, [g, t]).setDepth(90).setAlpha(0);
+    this.toast = c;
+    this.mergeEmitter.setParticleTint(0xffd23f);
+    this.mergeEmitter.explode(14, cx, 130);
+    sfx.fanfare();
+    this.tweens.add({ targets: c, y: 168, alpha: 1, duration: 300, ease: 'Back.easeOut' });
+    this.tweens.add({
+      targets: c,
+      alpha: 0,
+      y: 138,
+      delay: 1600,
+      duration: 320,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        if (this.toast === c) {
+          c.destroy();
+          this.toast = null;
+        }
+      },
+    });
   }
 
   /** Expanding light ring on merge, tinted with the new fruit's color. */
@@ -693,6 +836,8 @@ export class GameScene extends Phaser.Scene {
     if (sh && sh.active) sh.destroy();
     const gl = f.getData('gloss') as Phaser.GameObjects.Image | undefined;
     if (gl && gl.active) gl.destroy();
+    const bo = f.getData('bounce') as Phaser.GameObjects.Image | undefined;
+    if (bo && bo.active) bo.destroy();
     // a chained merge can destroy a fruit while its pop tween is still
     // running — kill tweens first, otherwise the tween writes scale to a
     // dead Matter body and throws.
@@ -762,7 +907,16 @@ export class GameScene extends Phaser.Scene {
 
   private addScore(n: number): void {
     this.score += n;
-    this.scoreText.setText(String(this.score));
+    // rolling count-up toward the true score — killTweensOf on the shared
+    // proxy retargets cleanly when merges land in quick succession
+    this.tweens.killTweensOf(this.scoreProxy);
+    this.tweens.add({
+      targets: this.scoreProxy,
+      v: this.score,
+      duration: 400,
+      ease: 'Cubic.easeOut',
+      onUpdate: () => this.scoreText.setText(String(Math.round(this.scoreProxy.v))),
+    });
     // juicy pop on every score change
     this.tweens.killTweensOf(this.scoreText);
     this.scoreText.setScale(1.25);
@@ -774,7 +928,7 @@ export class GameScene extends Phaser.Scene {
 
   // ---------------- danger / game over ----------------
 
-  private checkDanger(now: number): void {
+  private checkDanger(now: number): boolean {
     let anyInZone = false;
     for (const f of this.fruits) {
       if (!f.active || f.getData('merging')) continue;
@@ -785,7 +939,7 @@ export class GameScene extends Phaser.Scene {
           f.setData('dangerSince', now);
         } else if (now - since >= GAME.dangerHoldMs) {
           this.gameOver();
-          return;
+          return true;
         }
       } else {
         f.setData('dangerSince', 0);
@@ -799,6 +953,7 @@ export class GameScene extends Phaser.Scene {
       this.lastDangerBucket = bucket;
       this.redrawDangerLine(pulse);
     }
+    return anyInZone;
   }
 
   private gameOver(): void {
@@ -828,12 +983,21 @@ export class GameScene extends Phaser.Scene {
     const layer = this.add.container(0, 0).setDepth(100);
     const dim = this.add.rectangle(cx, cy, GAME.width, GAME.height, 0x000000, 0.55).setInteractive();
     const panel = this.add.graphics();
+    // soft drop shadow for lift
+    panel.fillStyle(0x2a1200, 0.3);
+    panel.fillRoundedRect(cx - 165, cy - 190 + 8, 330, 380, 18);
     panel.fillStyle(0xfffdf4, 1);
     panel.fillRoundedRect(cx - 165, cy - 190, 330, 380, 18);
-    panel.lineStyle(4, 0xe0a83e, 1);
+    // top sheen
+    panel.fillStyle(0xffffff, 0.5);
+    panel.fillRoundedRect(cx - 155, cy - 182, 310, 44, 14);
+    panel.lineStyle(3, 0xe0a83e, 1);
     panel.strokeRoundedRect(cx - 165, cy - 190, 330, 380, 18);
 
-    const title = makeText(this, cx, cy - 150, STR.gameOver, { fontSize: '34px', color: '#c0392b', fontStyle: 'bold' })
+    const title = makeText(this, cx, cy - 150, STR.gameOver, {
+        fontSize: '34px', color: '#c0392b', fontStyle: 'bold',
+        shadow: { offsetX: 0, offsetY: 2, color: '#f5d9a8', blur: 0, fill: true },
+      })
       .setOrigin(0.5);
     const recordTxt = isRecord
       ? makeText(this, cx, cy - 112, STR.newRecord, { fontSize: '18px', color: '#e67e22', fontStyle: 'bold' }).setOrigin(0.5)
@@ -874,6 +1038,25 @@ export class GameScene extends Phaser.Scene {
     layer.setScale(0.85).setAlpha(0);
     this.tweens.add({ targets: layer, scaleX: 1, scaleY: 1, alpha: 1, duration: 220, ease: 'Back.easeOut' });
     this.overLayer = layer;
+    // new record: confetti rain + the badge keeps bouncing
+    if (isRecord) {
+      const cols = [0xffd23f, 0xff6b9d, 0x7ddf8a, 0x7fb8ff];
+      for (const col of cols) {
+        this.confettiEmitter.setParticleTint(col);
+        this.confettiEmitter.explode(20, cx + Phaser.Math.Between(-90, 90), cy - 210);
+      }
+      if (recordTxt) {
+        this.tweens.add({
+          targets: recordTxt,
+          scaleX: 1.18,
+          scaleY: 1.18,
+          duration: 420,
+          ease: 'Sine.easeInOut',
+          yoyo: true,
+          repeat: -1,
+        });
+      }
+    }
   }
 
   // ---------------- pause ----------------
@@ -936,8 +1119,16 @@ export class GameScene extends Phaser.Scene {
     for (const f of [...this.fruits]) this.removeFruit(f);
     this.pendingMerges = [];
     this.score = 0;
+    this.scoreProxy.v = 0;
     this.scoreText.setText('0');
     this.maxTierReached = 1;
+    this.unlockedTiers.clear();
+    this.zoomPulseAt = 0;
+    if (this.toast) {
+      this.tweens.killTweensOf(this.toast);
+      this.toast.destroy();
+      this.toast = null;
+    }
     this.state = 'aim';
     this.matter.world.resume();
     this.currentTier = pickSpawnTier(Math.random);
@@ -982,15 +1173,24 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.processMerges();
-    this.checkDanger(time);
+    const inDanger = this.checkDanger(time);
+    // red danger edge: ease toward a pulsing target while any fruit sits in
+    // the danger zone, ease back to 0 otherwise
+    const edgeTarget = inDanger ? 0.5 + 0.3 * Math.abs(Math.sin(time / 160)) : 0;
+    const edge = this.dangerEdgeImg;
+    edge.setAlpha(edge.alpha + (edgeTarget - edge.alpha) * Math.min(1, delta * 0.008));
     this.updateShadows();
     this.updateRestingSquash(delta);
+    // danger line breathing pulse
+    this.dangerT += delta;
+    this.dangerGfx.setAlpha(0.82 + 0.18 * Math.sin(this.dangerT / 520));
   }
 
   /** Sync each fruit's followers: the blob shadow glued under the fruit
-   *  (shrinking/fading as the fruit rises — sells the 3D depth) and the
-   *  jelly gloss highlight (screen-space top-left, counter-rotated against
-   *  the fruit's roll, deforming with the resting squash). Allocation-free. */
+   *  (shrinking/fading as the fruit rises — sells the 3D depth), the jelly
+   *  gloss highlight (screen-space top-left, counter-rotated against the
+   *  fruit's roll, deforming with the resting squash), and the warm bounce
+   *  light at the screen-space bottom (never rotated). Allocation-free. */
   private updateShadows(): void {
     for (const f of this.fruits) {
       if (!f.active) continue;
@@ -1014,6 +1214,16 @@ export class GameScene extends Phaser.Scene {
         gl.y = f.y - r * 0.36 * ky;
         gl.setScale((f.getData('glSX') as number) * kx, (f.getData('glSY') as number) * ky);
         gl.setRotation(-0.45 - f.rotation);
+      }
+      const bo = f.getData('bounce') as Phaser.GameObjects.Image | undefined;
+      if (bo && bo.active) {
+        const baseSX = f.getData('baseSX') as number;
+        const baseSY = f.getData('baseSY') as number;
+        const kx = f.scaleX / baseSX;
+        const ky = f.scaleY / baseSY;
+        bo.x = f.x;
+        bo.y = f.y + r * 0.45 * ky;
+        bo.setScale((f.getData('bSX') as number) * kx, (f.getData('bSY') as number) * ky);
       }
     }
   }
