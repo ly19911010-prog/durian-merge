@@ -8,16 +8,16 @@ import { makeText } from '../systems/ui';
 // art replacing the v3.0 jelly gradients) — renamed for cache-busting
 // (phone browsers cached the old URLs).
 const FRUIT_FILES: Array<[string, string]> = [
-  ['fruit_01', 'assets/fruits/fruit_01_v60.png'],
-  ['fruit_02', 'assets/fruits/fruit_02_v60.png'],
-  ['fruit_03', 'assets/fruits/fruit_03_v60.png'],
-  ['fruit_04', 'assets/fruits/fruit_04_v60.png'],
-  ['fruit_05', 'assets/fruits/fruit_05_v60.png'],
-  ['fruit_06', 'assets/fruits/fruit_06_v60.png'],
-  ['fruit_07', 'assets/fruits/fruit_07_v60.png'],
-  ['fruit_08', 'assets/fruits/fruit_08_v60.png'],
-  ['fruit_09', 'assets/fruits/fruit_09_v60.png'],
-  ['fruit_10', 'assets/fruits/fruit_10_v60.png'],
+  ['fruit_01', 'assets/fruits/fruit_01_v61.png'],
+  ['fruit_02', 'assets/fruits/fruit_02_v61.png'],
+  ['fruit_03', 'assets/fruits/fruit_03_v61.png'],
+  ['fruit_04', 'assets/fruits/fruit_04_v61.png'],
+  ['fruit_05', 'assets/fruits/fruit_05_v61.png'],
+  ['fruit_06', 'assets/fruits/fruit_06_v61.png'],
+  ['fruit_07', 'assets/fruits/fruit_07_v61.png'],
+  ['fruit_08', 'assets/fruits/fruit_08_v61.png'],
+  ['fruit_09', 'assets/fruits/fruit_09_v61.png'],
+  ['fruit_10', 'assets/fruits/fruit_10_v61.png'],
 ];
 
 export class BootScene extends Phaser.Scene {
