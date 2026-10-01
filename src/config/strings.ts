@@ -21,6 +21,7 @@ export const STR = {
   soundOff: '🔇',
   pauseIcon: '⏸',
   newRecord: '🎉 新纪录！',
+  unlockNew: '✨ 解锁新水果：',
   loading: '加载中…',
   howTo: '拖动瞄准，松手掉落\n相同水果相碰即可合成',
 } as const;
