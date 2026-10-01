@@ -85,7 +85,7 @@ export const sfx = {
   drop(): void {
     tone(240, 0.14, { type: 'sine', vol: 0.16, slideTo: 130 });
   },
-  /** merge — pitch rises with tier */
+  /** merge — pitch rises with tier (Suika-style pitch ladder) */
   merge(tier: number): void {
     const f = 300 + tier * 65;
     tone(f, 0.16, { type: 'triangle', vol: 0.22 });
@@ -116,6 +116,12 @@ export const sfx = {
   /** quiet squash thump when a fruit lands (paired with the squash tween) */
   land(): void {
     tone(140, 0.08, { type: 'sine', vol: 0.07, slideTo: 80 });
+  },
+  /** little unlock fanfare: two rising chimes + sparkle */
+  fanfare(): void {
+    tone(660, 0.12, { type: 'triangle', vol: 0.16 });
+    tone(880, 0.16, { type: 'triangle', vol: 0.16, delay: 0.1 });
+    tone(1320, 0.22, { type: 'sine', vol: 0.1, delay: 0.2 });
   },
   /** Durian Burst shockwave */
   burst(): void {
