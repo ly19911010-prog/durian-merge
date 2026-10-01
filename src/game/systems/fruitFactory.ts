@@ -1,6 +1,6 @@
 /** Fruit entity factory — creates physics fruits with consistent visuals/body. */
 import Phaser from 'phaser';
-import { GAME, texForTier, radiusForTier, bodyFactorForTier } from '../../config/gameConfig';
+import { GAME, texForTier, radiusForTier, bodyFactorForTier, restitutionForTier, densityForTier } from '../../config/gameConfig';
 
 export type FruitGO = Phaser.Physics.Matter.Image;
 
@@ -35,11 +35,11 @@ export function createFruit(
   // the hair-smaller body.
   const img = scene.matter.add.image(x, y, texForTier(tier), undefined, {
     shape: { type: 'circle', radius: 256 * bodyFactorForTier(tier) * GAME.bodyTouchOverlap },
-    restitution: p.restitution,
+    restitution: restitutionForTier(tier),
     friction: p.friction,
     frictionStatic: p.frictionStatic,
     frictionAir: p.frictionAir,
-    density: 0.0018,
+    density: densityForTier(tier),
   }) as FruitGO;
   // display size matches physics body; higher tiers look bigger
   img.setDisplaySize(r * 2, r * 2);
@@ -75,6 +75,17 @@ export function createFruit(
     img.setData('glSX', glSX);
     img.setData('glSY', glSY);
   }
+  // bounce light: warm under-glow at the fruit's screen-space bottom
+  // (depth 2.4: above the fruit, below the gloss). Fakes floor reflection;
+  // synced in GameScene.updateShadows() like the gloss but never rotated.
+  const bounce = scene.add.image(x, y + r * 0.45, 'bounceLight');
+  bounce.setDepth(2.4).setAlpha(0.42);
+  const bSX = (r * 1.12) / 128;
+  const bSY = (r * 0.72) / 64;
+  bounce.setScale(bSX, bSY);
+  img.setData('bounce', bounce);
+  img.setData('bSX', bSX);
+  img.setData('bSY', bSY);
   img.setData('isFruit', true);
   img.setData('tier', tier);
   img.setData('bornAt', nowMs);
