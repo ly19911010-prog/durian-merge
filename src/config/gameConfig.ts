@@ -137,7 +137,28 @@ export function bodyFactorForTier(tier: number): number {
   return def.bodyFactor;
 }
 
+/**
+ * Per-tier restitution (v6.3, Suika-style "floaty" feel): small fruits are
+ * bouncy and lively on drop, big fruits land dead so the pile settles stably.
+ * Previously a flat 0.25 for all tiers — the pile felt uniformly dull.
+ */
+export function restitutionForTier(tier: number): number {
+  if (tier <= 0 || tier > MAX_TIER) throw new Error(`invalid tier ${tier}`);
+  if (tier <= 3) return 0.45;
+  if (tier <= 6) return 0.3;
+  return 0.15;
+}
+
 /** Texture key for a tier. */
 export function texForTier(tier: number): string {
   return FRUITS[tier - 1].tex;
+}
+
+/**
+ * Per-tier density (v6.3): big fruits are heavier so the pile settles stably
+ * and small fruits can't bulldoze them. Base 0.0018, +6% per tier.
+ */
+export function densityForTier(tier: number): number {
+  if (tier <= 0 || tier > MAX_TIER) throw new Error(`invalid tier ${tier}`);
+  return 0.0018 * (1 + tier * 0.06);
 }
