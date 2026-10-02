@@ -7,6 +7,14 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <title>榴莲大作战 · Durian Merge</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#fbf7ee" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="榴莲大作战" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,7 +27,7 @@
         margin: 0;
         padding: 0;
         height: 100%;
-        background: #20301f;
+        background: #fbf7ee;
         overflow: hidden;
         overscroll-behavior: none;
       }
@@ -37,5 +45,13 @@
   <body>
     <div id="game-root"></div>
     <script type="module" src="/src/main.ts"></script>
+    <script>
+      // v6.4 PWA: offline play after first visit
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>
