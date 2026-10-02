@@ -76,9 +76,13 @@ export const GAME = {
    * 34/41/51/62/75/92/112/137/167/204px. Head-to-tail 6.0x (was 3.25x):
    * every merge reads as a real size-up. Tier 10 (204px) still fits the
    * 392px-wide box.
+   * v6.5b: t1/t2 still read as same size — push the low end down and steepen:
+   * geoBaseDiameter = 28, geoRatio = 1.24 (~24% step). Full ladder ≈
+   * 28/35/43/53/66/82/102/126/157/194px. t1 is now distinctly tiny
+   * (Suika-cherry-like), t1→t2 jumps 25%. Head-to-tail 6.9x.
    */
-  geoBaseDiameter: 34,
-  geoRatio: 1.22,
+  geoBaseDiameter: 28,
+  geoRatio: 1.24,
 
   /**
    * Body radius = visual radius × this fruit's bodyFactor × this overlap.
