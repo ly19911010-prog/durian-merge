@@ -80,9 +80,12 @@ export const GAME = {
    * geoBaseDiameter = 28, geoRatio = 1.24 (~24% step). Full ladder ≈
    * 28/35/43/53/66/82/102/126/157/194px. t1 is now distinctly tiny
    * (Suika-cherry-like), t1→t2 jumps 25%. Head-to-tail 6.9x.
+   * v6.5c: user says all fruits too small — scale everything up:
+   * geoBaseDiameter = 40, geoRatio = 1.20 (~20% step). Full ladder ≈
+   * 40/48/58/69/83/100/119/143/172/206px. Head-to-tail 5.2x.
    */
-  geoBaseDiameter: 28,
-  geoRatio: 1.24,
+  geoBaseDiameter: 40,
+  geoRatio: 1.20,
 
   /**
    * Body radius = visual radius × this fruit's bodyFactor × this overlap.
