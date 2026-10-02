@@ -141,13 +141,15 @@ export class GameScene extends Phaser.Scene {
 
   private buildWalls(): void {
     const t = 14;
-    // invisible physics bounds (positions unchanged)
+    const L = GAME.innerLeft;
+    const R = GAME.innerRight;
+    // invisible physics bounds, derived from the (v6.6 narrowed) box
     const mkWall = (x: number, y: number, w: number, h: number) => {
       const rect = this.add.rectangle(x, y, w, h, 0xffffff, 0);
       this.matter.add.gameObject(rect, { isStatic: true, friction: 0.4 });
     };
-    mkWall(t / 2, GAME.height / 2, t, GAME.height); // left
-    mkWall(GAME.width - t / 2, GAME.height / 2, t, GAME.height); // right
+    mkWall(L - t / 2, GAME.height / 2, t, GAME.height); // left
+    mkWall(R + t / 2, GAME.height / 2, t, GAME.height); // right
     mkWall(GAME.width / 2, GAME.floorTop + t, GAME.width, t * 2); // floor
     this.drawWoodFrame();
   }
@@ -161,16 +163,17 @@ export class GameScene extends Phaser.Scene {
     const F = GAME.floorTop;
     const H = GAME.height;
     // side planks: vertical gradient, plank seams, inner bevel highlight
-    for (const x of [0, R]) {
+    // (v6.6: planks flank the narrowed box at L-t and R)
+    for (const x of [L - t, R]) {
       g.fillGradientStyle(0xc08a4e, 0xc08a4e, 0x8a5a2c, 0x8a5a2c, 1, 1, 1, 1);
       g.fillRect(x, 0, t, F + t);
       g.lineStyle(1.5, 0x6e4520, 0.55);
       for (let y = 46; y < F; y += 54) g.lineBetween(x + 2, y, x + t - 2, y);
       g.lineStyle(2, 0xe0b070, 0.7); // inner bevel light (v2.5: softened)
-      const bx = x === 0 ? x + t - 1.5 : x + 1.5;
+      const bx = x === L - t ? x + t - 1.5 : x + 1.5;
       g.lineBetween(bx, 4, bx, F + t - 4);
       g.lineStyle(2, 0x5e3a18, 0.55); // outer dark edge (v2.5: softened)
-      const ox = x === 0 ? x + 1.5 : x + t - 1.5;
+      const ox = x === L - t ? x + 1.5 : x + t - 1.5;
       g.lineBetween(ox, 4, ox, F + t - 4);
     }
     // floor planks: horizontal gradient + seams
