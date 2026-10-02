@@ -36,8 +36,8 @@ export const GAME = {
   height: 740,
 
   /** container inner bounds (walls) */
-  innerLeft: 14,
-  innerRight: 406,
+  innerLeft: 40,
+  innerRight: 380,
   floorTop: 690,
 
   /** fruit hangs / drops from here (below the HUD strip) */
