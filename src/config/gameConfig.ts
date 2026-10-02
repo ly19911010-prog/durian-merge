@@ -71,9 +71,14 @@ export const GAME = {
    * 52/59/68/77/88/100/114/130/148/169px. Tier 10 stays box-friendly
    * (169px in a 392px-wide box); floorTop moved up 712 → 690 to make room
    * for the bottom evolution bar.
+   * v6.5: user wants truly exponential size jumps — geoBaseDiameter = 34,
+   * geoRatio = 1.22 (~22% step). Full ladder ≈
+   * 34/41/51/62/75/92/112/137/167/204px. Head-to-tail 6.0x (was 3.25x):
+   * every merge reads as a real size-up. Tier 10 (204px) still fits the
+   * 392px-wide box.
    */
-  geoBaseDiameter: 52,
-  geoRatio: 1.14,
+  geoBaseDiameter: 34,
+  geoRatio: 1.22,
 
   /**
    * Body radius = visual radius × this fruit's bodyFactor × this overlap.
