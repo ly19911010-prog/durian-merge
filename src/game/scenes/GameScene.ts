@@ -4,7 +4,7 @@
  * merges at most once, even under fast collisions.
  */
 import Phaser from 'phaser';
-import { GAME, FRUITS, MAX_TIER, radiusForTier } from '../../config/gameConfig';
+import { GAME, FRUITS, MAX_TIER, radiusForTier, bodyFactorForTier } from '../../config/gameConfig';
 import { STR } from '../../config/strings';
 import {
   pickSpawnTier,
@@ -642,13 +642,16 @@ export class GameScene extends Phaser.Scene {
 
     const fruit = createFruit(this, x, y, newTier, now);
     // "squeezed out" feel: a tiny upward hop on birth (popIn adds the scale pop)
-    fruit.setVelocity(0, -1.8);
-    // merge displacement (v6.3, Suika-style): the new bigger fruit shoves
-    // overlapping neighbours outward so the pile visibly buckles — this is
-    // what enables Puyo-style chain reactions. Gentle by design: just enough
-    // to nudge, never enough to launch fruits out of the box.
+    // v6.4 toned down per Ly: -1.8 -> -1.2
+    fruit.setVelocity(0, -1.2);
+    // merge displacement (v6.3, Suika-style): the new bigger fruit nudges
+    // overlapping neighbours outward so the pile settles instead of leaving
+    // gaps. v6.4 toned down per Ly ("too much"): much gentler now — just
+    // enough to close gaps, never enough to visibly shove the pile.
+    // Uses body radii (not display radii) so the range matches the actual
+    // physics bodies after the v6.4 bodyFactor fix.
     {
-      const R = radiusForTier(newTier);
+      const R = radiusForTier(newTier) * bodyFactorForTier(newTier);
       for (const f of this.fruits) {
         if (f === fruit || f.getData('merging')) continue;
         const body = f.body as MatterJS.BodyType | null;
@@ -657,13 +660,13 @@ export class GameScene extends Phaser.Scene {
         const dy = f.y - y;
         const d = Math.hypot(dx, dy);
         if (d < 0.01) continue;
-        const fr = radiusForTier(f.getData('tier') as number);
-        const range = (R + fr) * 1.12;
+        const fr = radiusForTier(f.getData('tier') as number) * bodyFactorForTier(f.getData('tier') as number);
+        const range = (R + fr) * 1.05;
         if (d < range) {
-          const push = 1.6 * (1 - d / range) + 0.4;
+          const push = 0.7 * (1 - d / range) + 0.15;
           const ux = dx / d;
           const uy = dy / d;
-          f.setVelocity(body.velocity.x + ux * push, body.velocity.y + uy * push - 0.4);
+          f.setVelocity(body.velocity.x + ux * push, body.velocity.y + uy * push - 0.15);
         }
       }
     }
