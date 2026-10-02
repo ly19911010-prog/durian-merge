@@ -32,7 +32,7 @@ export class BootScene extends Phaser.Scene {
     }).setOrigin(0.5);
     this.load.on('complete', () => label.destroy());
     for (const [key, path] of FRUIT_FILES) this.load.image(key, path);
-    this.load.image('bg_dusk', 'assets/bg/bg_dusk_v50.png');
+    this.load.image('bg_gradient', 'assets/bg/bg_gradient_v64.png');
   }
 
   create(): void {
