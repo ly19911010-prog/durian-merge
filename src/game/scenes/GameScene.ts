@@ -52,6 +52,7 @@ export class GameScene extends Phaser.Scene {
   /** tiers first synthesized this session — drives the unlock toast */
   private unlockedTiers = new Set<number>();
   private toast: Phaser.GameObjects.Container | null = null;
+  private evoIcons: Phaser.GameObjects.Image[] = [];
   private dangerEdgeImg!: Phaser.GameObjects.Image;
   private zoomPulseAt = 0;
   /** rolling particle budget: juice bursts are capped so effects stay grand
@@ -81,6 +82,7 @@ export class GameScene extends Phaser.Scene {
 
     drawBackground(this);
     this.buildWalls();
+    this.buildEvolutionBar();
     this.buildDangerLine();
     this.buildHud();
     this.buildEmitters();
@@ -188,8 +190,54 @@ export class GameScene extends Phaser.Scene {
     void L;
   }
 
-  private buildDangerLine(): void {
-    this.dangerGfx = this.add.graphics().setDepth(5);
+  /** Fruit evolution bar along the bottom of the box (v6.7): dark pill with
+   * all 10 fruits in order; tiers not yet reached this run stay dimmed,
+   * lighting up as the player synthesizes them — Suika-style. */
+  private buildEvolutionBar(): void {
+    const L = GAME.innerLeft;
+    const R = GAME.innerRight;
+    const cy = GAME.floorTop + 25; // center of the floor strip
+    const g = this.add.graphics().setDepth(4);
+    g.fillStyle(0x2a1a0e, 0.55);
+    g.fillRoundedRect(L - 8, cy - 18, R - L + 16, 36, 18);
+    g.lineStyle(1.5, 0xffffff, 0.14);
+    g.strokeRoundedRect(L - 8, cy - 18, R - L + 16, 36, 18);
+    this.evoIcons = [];
+    const n = FRUITS.length;
+    for (let i = 0; i < n; i++) {
+      const x = L + ((i + 0.5) / n) * (R - L);
+      const img = this.add
+        .image(x, cy, FRUITS[i].tex)
+        .setDisplaySize(24, 24)
+        .setDepth(5)
+        .setAlpha(0.22);
+      this.evoIcons.push(img);
+    }
+    this.refreshEvolutionBar();
+  }
+
+  private refreshEvolutionBar(): void {
+    for (let i = 0; i < this.evoIcons.length; i++) {
+      const unlocked = i + 1 <= this.maxTierReached;
+      const img = this.evoIcons[i];
+      if (img.alpha < 1 && unlocked) {
+        // just unlocked: pop in with a quick scale bounce
+        img.setAlpha(1);
+        this.tweens.add({
+          targets: img,
+          scaleX: img.scaleX * 1.35,
+          scaleY: img.scaleY * 1.35,
+          duration: 160,
+          yoyo: true,
+          ease: 'Quad.easeOut',
+        });
+      } else {
+        img.setAlpha(unlocked ? 1 : 0.22);
+      }
+    }
+  }
+
+  private buildDangerLine(): void {    this.dangerGfx = this.add.graphics().setDepth(5);
     this.redrawDangerLine(0.45);
     makeText(this, GAME.width / 2, GAME.dangerLineY - 18, STR.dangerLine, {
       fontFamily: FONT_FAMILY, fontSize: '14px', color: '#fff3d9',
@@ -676,6 +724,7 @@ export class GameScene extends Phaser.Scene {
     this.fruits.push(fruit);
     this.enforceCap();
     this.maxTierReached = Math.max(this.maxTierReached, newTier);
+    this.refreshEvolutionBar();
 
     const color = FRUITS[newTier - 1].color;
     const gained = mergeScoreForTier(newTier);
